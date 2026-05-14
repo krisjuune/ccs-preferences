@@ -26,6 +26,7 @@ os.makedirs("output/plots", exist_ok=True)
 # %% pymc bug workaround
 
 import pytensor
+import pytensor.tensor as pt
 pytensor.config.cxx = '/usr/bin/clang++'
 
 # %% 
@@ -61,21 +62,35 @@ for attr in attributes:
                               [level for level in df[attr].unique() if level != baseline], 
                               ordered=True)
 
-# generate dummies with columns in the correct order
-dummies = pd.get_dummies(df[attributes], drop_first=True)
+# generate dummies with all levels (no baseline dropped)
+dummies = pd.get_dummies(df[attributes], drop_first=False)
 
-# reorder columns in attribute order
+# reorder columns: baseline first, then remaining levels, for each attribute
 ordered_columns = []
 for attr in attributes:
-    attr_columns = [col for col in dummies.columns if col.startswith(attr)]
-    ordered_columns.extend(attr_columns)
+    baseline_col = f"{attr}_{baseline_dict[attr]}"
+    attr_columns  = [col for col in dummies.columns if col.startswith(attr)]
+    ordered_columns.append(baseline_col)
+    ordered_columns.extend([col for col in attr_columns if col != baseline_col])
 
-# reorder dummies according to ordered columns list
 dummies = dummies[ordered_columns]
 dummies = dummies.loc[:, ~dummies.columns.duplicated()]
 
-# mask selecting only attr_source_purpose columns — framing only affects this attribute
-sp_mask = np.array([1.0 if col.startswith("attr_source_purpose") else 0.0 for col in dummies.columns])
+# per-attribute index groups for sum-to-zero constraint on beta
+level_names = dummies.columns.tolist()
+attr_slices = [
+    [i for i, col in enumerate(level_names) if col.startswith(attr)]
+    for attr in attributes
+]
+
+# framing contrast for attr_source_purpose: -0.5 for baseline (domestic), +0.5 for others
+# sums to zero across levels, consistent with the sum-to-zero constraint on beta
+sp_baseline_col = f"attr_source_purpose_{baseline_dict['attr_source_purpose']}"
+sp_contrast = np.array([
+    -0.5 if col == sp_baseline_col else
+    (0.5 if col.startswith("attr_source_purpose") else 0.0)
+    for col in dummies.columns
+])
 
 df["framing"] = df["framing"].astype("category")
 df["country"] = df["country"].astype("category")
@@ -92,17 +107,31 @@ coords = {
 
 with pm.Model(coords=coords) as bayes_model:
     
-    # main effect of attribute levels
-    beta = pm.Normal("beta", mu=0, sigma=2, dims="level")
+    # main effects — sum-to-zero within each attribute so beta = deviation from
+    # attribute mean rather than deviation from an arbitrary baseline
+    beta_raw = pm.Normal("beta_raw", mu=0, sigma=2, dims="level")
+    beta = pm.Deterministic(
+        "beta",
+        pt.concatenate([beta_raw[idx] - beta_raw[idx].mean() for idx in attr_slices]),
+        dims="level",
+    )
 
     # framing effect on attr_source_purpose only (scalar — one attribute is framed)
     delta = pm.Normal("delta", mu=0, sigma=1)
 
-    # country effect — zero-sum constraint so beta = true average across countries
+    # country effect — two zero-sum constraints:
+    # 1. across countries per level (so beta = true average across countries)
+    # 2. across levels within each attribute per country (needed because all
+    #    levels are included and adding a constant per attribute cancels in U_left - U_right)
     gamma_raw = pm.Normal("gamma_raw", mu=0, sigma=1, dims=["country", "level"])
+    gamma_cc  = gamma_raw - gamma_raw.mean(axis=0)
     gamma = pm.Deterministic(
         "gamma",
-        gamma_raw - gamma_raw.mean(axis=0),
+        pt.concatenate(
+            [gamma_cc[:, idx] - gamma_cc[:, idx].mean(axis=1, keepdims=True)
+             for idx in attr_slices],
+            axis=1,
+        ),
         dims=["country", "level"],
     )
     
@@ -134,7 +163,7 @@ with pm.Model(coords=coords) as bayes_model:
     # compute modified coefficients depending on framing
     # this gives beta + delta * framing per task and level
     # adding country effect
-    beta_framed = beta + delta * sp_mask * f[:, None] + gamma[c, :]
+    beta_framed = beta + delta * sp_contrast * f[:, None] + gamma[c, :]
 
     # compute utility
     utility_left = pm.Deterministic(

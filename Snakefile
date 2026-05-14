@@ -3,8 +3,8 @@ configfile: "config.yaml"
 
 rule all:
     input:
-        "output/data/inference_basic_choice.nc",
-        "output/data/inference_hybrid_choice.nc",
+        "output/plots/partworths.png",
+        "output/plots/country_utilities.png",
 
 
 rule preprocess:
@@ -57,3 +57,33 @@ rule hybrid_choice_model:
         "output/data/inference_hybrid_choice.nc",
     script:
         "scripts/analysis/hybrid_choice_model.py"
+
+
+rule postprocess:
+    input:
+        bcm="output/data/inference_basic_choice.nc",
+        hcm="output/data/inference_hybrid_choice.nc",
+    output:
+        beta="output/data/posteriors_beta.csv",
+        country="output/data/posteriors_country.csv",
+        theta="output/data/posteriors_theta.csv",
+    script:
+        "scripts/postprocessing/postprocessing.py"
+
+
+rule plot_partworths:
+    input:
+        "output/data/posteriors_beta.csv",
+    output:
+        "output/plots/partworths.png",
+    shell:
+        "Rscript scripts/visualisation/plot_partworths.R"
+
+
+rule plot_country:
+    input:
+        "output/data/posteriors_country.csv",
+    output:
+        "output/plots/country_utilities.png",
+    shell:
+        "Rscript scripts/visualisation/plot_country.R"

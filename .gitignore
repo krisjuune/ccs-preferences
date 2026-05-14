@@ -8,3 +8,4 @@ scripts/preprocessing/__pycache__/
 .DS_Store
 .*
 .vs_code/
+*.pdf

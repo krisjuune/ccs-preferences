@@ -11,6 +11,10 @@ dependencies:
   - xarray
   - pytensor
   - netcdf4
+  - r-base
+  - r-tidyverse
+  - r-ggdist
+  - r-ggtext
   - pip
   - pip:
     - snakemake
