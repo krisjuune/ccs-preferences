@@ -5,6 +5,8 @@ rule all:
     input:
         "output/plots/partworths.png",
         "output/plots/country_utilities.png",
+        "output/plots/theta_forest.png",
+        "output/plots/theta_heatmap.png",
 
 
 rule preprocess:
@@ -87,3 +89,21 @@ rule plot_country:
         "output/plots/country_utilities.png",
     shell:
         "Rscript scripts/visualisation/plot_country.R"
+
+
+rule plot_theta_forest:
+    input:
+        "output/data/posteriors_theta.csv",
+    output:
+        "output/plots/theta_forest.png",
+    shell:
+        "Rscript scripts/visualisation/plot_theta_forest.R"
+
+
+rule plot_theta_heatmap:
+    input:
+        "output/data/posteriors_theta.csv",
+    output:
+        "output/plots/theta_heatmap.png",
+    shell:
+        "Rscript scripts/visualisation/plot_theta_heatmap.R"
