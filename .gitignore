@@ -2,6 +2,9 @@ data/
 raw_data/
 output/
 scripts/quota_check.py
+/scripts/hainmueller/
 init_kernel.py
 scripts/preprocessing/__pycache__/
 .DS_Store
+.*
+.vs_code/

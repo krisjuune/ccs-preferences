@@ -1,14 +1,24 @@
 import pandas as pd
 import re
 
+try:
+    _ch_in = snakemake.input.ch
+    _cn_in = snakemake.input.cn
+    _ch_out = snakemake.output.ch
+    _cn_out = snakemake.output.cn
+except NameError:
+    _ch_in = "raw_data/ccs_conjoint_CH_240225_1004.csv"
+    _cn_in = "raw_data/ccs_conjoint_CN_240225_1752.csv"
+    _ch_out = "data/data_untranslated_ch.csv"
+    _cn_out = "data/data_untranslated_cn.csv"
 
 # %% import data
 
 pd.set_option('display.max_columns', None)
 
 files = {
-    "CH": "raw_data/ccs_conjoint_CH_240225_1004.csv",
-    "CN": "raw_data/ccs_conjoint_CN_240225_1752.csv"
+    "CH": _ch_in,
+    "CN": _cn_in,
 }
 
 dataframes = {}
@@ -87,8 +97,8 @@ cn_df = dataframes["CN"]
 
 # %% save clean data
 
-cn_df.to_csv("data/data_untranslated_cn.csv")
-ch_df.to_csv("data/data_untranslated_ch.csv")
+cn_df.to_csv(_cn_out)
+ch_df.to_csv(_ch_out)
 
 
 # %%

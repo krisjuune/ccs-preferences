@@ -1,8 +1,27 @@
-import pymc as pm 
+import os
+import pymc as pm
 import pandas as pd
 import arviz as az
-import xarray as xr
 import numpy as np
+import matplotlib.pyplot as plt
+
+try:
+    _mcmc = snakemake.config["mcmc"]
+    _draws = _mcmc["draws"]
+    _tune = _mcmc["tune"]
+    _chains = _mcmc["chains"]
+    _cores = _mcmc["cores"]
+    _output = snakemake.output[0]
+except NameError:
+    _draws, _tune, _chains, _cores = 250, 250, 4, 4
+    _output = "output/data/inference_hybrid_choice.nc"
+
+_model_name = os.path.splitext(os.path.basename(_output))[0]
+_out_data = os.path.join("output", "data", _model_name)
+_out_ql = os.path.join("output", "quick_look", _model_name)
+os.makedirs("output/data", exist_ok=True)
+os.makedirs("output/quick_look", exist_ok=True)
+os.makedirs("output/plots", exist_ok=True)
 
 # %% pymc bug workaround
 
@@ -15,21 +34,21 @@ df = pd.read_csv("data/hcm_input.csv")
 
 # %% define attributes and baselines
 
-attributes = [ 
-    # "attr_engagement",
+attributes = [
+    "attr_engagement",
     "attr_vicinity",
     "attr_industry",
     "attr_costs",
-    # "attr_reason",
+    "attr_reason",
     "attr_source_purpose"
 ]
 
 baseline_dict = {
-    # "attr_engagement": "inform",
+    "attr_engagement": "inform",
     "attr_vicinity": "abroad",
     "attr_industry": "waste incineration",
     "attr_costs": "taxpayer",
-    # "attr_reason": "sparsely-populated",
+    "attr_reason": "sparsely-populated",
     "attr_source_purpose": "domestic"
 }
 
@@ -43,37 +62,44 @@ for attr in attributes:
                               ordered=True)
 
 # generate dummies with columns in the correct order
-dummies = pd.get_dummies(df[attributes], drop_first=False)
+dummies = pd.get_dummies(df[attributes], drop_first=True)
 
-# reorder columns to place baseline first for each attribute
+# reorder columns to place non-baseline levels in order for each attribute
 ordered_columns = []
 for attr in attributes:
-    # Collect the columns related to the attribute and put baseline first
     attr_columns = [col for col in dummies.columns if col.startswith(attr)]
-    baseline_column = f"{attr}_{baseline_dict[attr]}"
-    ordered_columns.append(baseline_column)
-    ordered_columns.extend([col for col in attr_columns if col != baseline_column])
+    ordered_columns.extend(attr_columns)
 
 # reorder dummies according to ordered columns list
 dummies = dummies[ordered_columns]
 dummies = dummies.loc[:, ~dummies.columns.duplicated()]
 
+# mask selecting only attr_source_purpose columns — framing only affects this attribute
+sp_mask = np.array([1.0 if col.startswith("attr_source_purpose") else 0.0 for col in dummies.columns])
+
 df["framing"] = df["framing"].astype("category")
 df["country"] = df["country"].astype("category")
 
-# add dimensions
+df_left = df[df.package == 1].reset_index(drop=True)
+df_right = df[df.package == 2].reset_index(drop=True)
+
+# create individual index that matches task dimension
 unique_individuals = df["id"].unique()
+id_to_index = {id_: i for i, id_ in enumerate(unique_individuals)}
+df["individual_idx"] = df["id"].map(id_to_index)
+individual_idx = df_left["id"].map(id_to_index).values
+
+# one row per individual for the measurement model (Likert items are individual-level, not task-level)
+df_survey = df.drop_duplicates("id").sort_values("individual_idx").reset_index(drop=True)
+
+# add dimensions as coords
 coords = {
     "level": dummies.columns.tolist(),
-    "task": np.arange(len(df) // 2),
+    "task": np.arange(df_left.shape[0]),
     "framing": df["framing"].cat.categories,
     "country": df["country"].cat.categories,
     "individual": unique_individuals
 }
-
-id_to_index = {id_: i for i, id_ in enumerate(unique_individuals)}
-df["individual_idx"] = df["id"].map(id_to_index)
-individual_idx = df.loc[df.package == 1, "individual_idx"].values
 
 # %% check coords
 
@@ -94,49 +120,48 @@ with pm.Model(coords=coords) as hcm_model:
     galtan_latent = pm.Normal("galtan_latent", mu=0, sigma=1, dims="individual")
     socio_ecol_latent = pm.Normal("socio_ecol_latent", mu=0, sigma=1, dims="individual")
 
-    # noise in observed scores
-    likert_sigma = 0.1
+    # factor loadings — first item per factor fixed to 1 for scale identification
+    lambda_lreco = pm.Normal("lambda_lreco", mu=1, sigma=0.5, shape=2)
+    lambda_galtan = pm.Normal("lambda_galtan", mu=1, sigma=0.5, shape=2)
+    lambda_ecol = pm.Normal("lambda_ecol", mu=1, sigma=0.5, shape=2)
 
-    # Observed variables as continuous (normalized to 0–1)
-    pm.Normal("lreco_1", mu=lreco_latent[individual_idx], sigma=likert_sigma, 
-              observed=df.loc[df.package == 1, "lreco_1"].values)
+    # estimated residual noise in Likert scores
+    likert_sigma = pm.HalfNormal("likert_sigma", sigma=0.3)
 
-    pm.Normal("lreco_2", mu=lreco_latent[individual_idx], sigma=likert_sigma, 
-              observed=df.loc[df.package == 1, "lreco_2"].values)
+    # measurement model — one observation per individual
+    survey_idx = df_survey["individual_idx"].values
 
-    pm.Normal("lreco_3", mu=lreco_latent[individual_idx], sigma=likert_sigma, 
-              observed=df.loc[df.package == 1, "lreco_3"].values)
+    pm.Normal("lreco_1", mu=lreco_latent[survey_idx], sigma=likert_sigma,
+              observed=df_survey["lreco_1"].values)
+    pm.Normal("lreco_2", mu=lambda_lreco[0] * lreco_latent[survey_idx], sigma=likert_sigma,
+              observed=df_survey["lreco_2"].values)
+    pm.Normal("lreco_3", mu=lambda_lreco[1] * lreco_latent[survey_idx], sigma=likert_sigma,
+              observed=df_survey["lreco_3"].values)
 
-    pm.Normal("galtan_1", mu=galtan_latent[individual_idx], sigma=likert_sigma, 
-              observed=df.loc[df.package == 1, "galtan_1"].values)
+    pm.Normal("galtan_1", mu=galtan_latent[survey_idx], sigma=likert_sigma,
+              observed=df_survey["galtan_1"].values)
+    pm.Normal("galtan_2", mu=lambda_galtan[0] * galtan_latent[survey_idx], sigma=likert_sigma,
+              observed=df_survey["galtan_2"].values)
+    pm.Normal("galtan_3", mu=lambda_galtan[1] * galtan_latent[survey_idx], sigma=likert_sigma,
+              observed=df_survey["galtan_3"].values)
 
-    pm.Normal("galtan_2", mu=galtan_latent[individual_idx], sigma=likert_sigma, 
-              observed=df.loc[df.package == 1, "galtan_2"].values)
+    pm.Normal("socio_ecological_1", mu=socio_ecol_latent[survey_idx], sigma=likert_sigma,
+              observed=df_survey["socio_ecological_1"].values)
+    pm.Normal("socio_ecological_2", mu=lambda_ecol[0] * socio_ecol_latent[survey_idx], sigma=likert_sigma,
+              observed=df_survey["socio_ecological_2"].values)
+    pm.Normal("socio_ecological_3", mu=lambda_ecol[1] * socio_ecol_latent[survey_idx], sigma=likert_sigma,
+              observed=df_survey["socio_ecological_3"].values)
 
-    pm.Normal("galtan_3", mu=galtan_latent[individual_idx], sigma=likert_sigma, 
-              observed=df.loc[df.package == 1, "galtan_3"].values)
+    # framing centred to -0.5/+0.5 so beta = average partworth across both framings
+    f = df_left["framing"].cat.codes.values.astype("float32") - 0.5
+    pm.Data("f", f, dims="task")
 
-    pm.Normal("socio_ecological_1", mu=socio_ecol_latent[individual_idx], sigma=likert_sigma, 
-              observed=df.loc[df.package == 1, "socio_ecological_1"].values)
-
-    pm.Normal("socio_ecological_2", mu=socio_ecol_latent[individual_idx], sigma=likert_sigma, 
-              observed=df.loc[df.package == 1, "socio_ecological_2"].values)
-
-    pm.Normal("socio_ecological_3", mu=socio_ecol_latent[individual_idx], sigma=likert_sigma, 
-              observed=df.loc[df.package == 1, "socio_ecological_3"].values)
-
-    # get framing and country codes
-    f = pm.Data("f", df.loc[df.package == 1, "framing"].cat.codes.values, dims="task")
-    f = f.astype("float32")
-    country_idx = df.loc[df.package == 1, "country"].cat.codes.values
-    c = pm.Data("c", country_idx, dims = "task")
+    c = df_left["country"].cat.codes.values
+    pm.Data("c", c, dims="task")
 
     # observed choices
-    observed_choice_left = pm.Data(
-        "observed_choice_left", 
-        df.loc[df.package == 1, "chosen"].values, 
-        dims="task"
-    )
+    observed_choice_left = df_left["chosen"].values
+    pm.Data("observed_choice_left", observed_choice_left, dims="task")
 
     # attribute dummies
     attribute_levels_left = pm.Data(
@@ -159,19 +184,24 @@ with pm.Model(coords=coords) as hcm_model:
     # choice model: main effects
     beta = pm.Normal("beta", mu=0, sigma=2, dims="level")
 
-    # framing-specific shift
-    delta = pm.Normal("delta", mu=0, sigma=1, dims="level")
+    # framing effect on attr_source_purpose only (scalar — one attribute is framed)
+    delta = pm.Normal("delta", mu=0, sigma=1)
 
-    # country effect
-    gamma = pm.Normal("gamma", mu=0, sigma=1, dims=["country", "level"])
+    # country effect — zero-sum constraint so beta = true average across countries
+    gamma_raw = pm.Normal("gamma_raw", mu=0, sigma=1, dims=["country", "level"])
+    gamma = pm.Deterministic(
+        "gamma",
+        gamma_raw - gamma_raw.mean(axis=0),
+        dims=["country", "level"],
+    )
 
     beta_modulated = (
         beta
-        + delta * f[:, None]
+        + delta * sp_mask * f[:, None]
         + gamma[c, :]
-        + theta_lreco * lreco_latent[individual_idx][:, None]
-        + theta_galtan * galtan_latent[individual_idx][:, None]
-        + theta_ecol * socio_ecol_latent[individual_idx][:, None]
+        + theta_lreco * (lreco_latent - lreco_latent.mean())[individual_idx][:, None]
+        + theta_galtan * (galtan_latent - galtan_latent.mean())[individual_idx][:, None]
+        + theta_ecol * (socio_ecol_latent - socio_ecol_latent.mean())[individual_idx][:, None]
     )
 
     # get utilities
@@ -188,82 +218,56 @@ with pm.Model(coords=coords) as hcm_model:
     )
 
     # likelihood
-    pm.Bernoulli("choice_distribution", p=prob_choice_left, observed = observed_choice_left)
+    pm.Bernoulli("choice_distribution", p=prob_choice_left, observed=observed_choice_left)
 
 # %% get priors
 
 priors = pm.sample_prior_predictive(
-    samples = 1000, 
-    model = hcm_model, 
-    random_seed = 42, 
+    draws=1000,
+    model=hcm_model,
+    random_seed=42,
 )
 
 # %% check priors
 
-priors.prior
-priors.prior.keys()
 az.summary(
     priors,
-    var_names=["beta", "gamma", "delta", "theta_lreco",]
-)
+    group="prior",
+    var_names=["beta", "delta", "gamma", "theta_lreco", "theta_galtan", "theta_ecol"],
+).to_csv(f"{_out_data}_prior_summary.csv")
 
-# %% test model 
-
-with hcm_model:
-    approx = pm.fit(n=10000, method="advi")
-    trace = approx.sample(1000)
-
-# %% run model (3 to 5 hours)
+# %% run model
 
 # run model with MCMC with 1000 draws, 500 tune samples, and 4 chains on 6 cores
 inference_data = pm.sample(
-    model = hcm_model, 
-    draws = 1000, 
-    tune = 500, 
-    chains = 4,
-    cores = 6, 
-    random_seed = 42, 
-    return_inferencedata = True, 
-    target_accept = 0.9
+    model=hcm_model,
+    draws=_draws,
+    tune=_tune,
+    chains=_chains,
+    cores=_cores,
+    random_seed=42,
+    return_inferencedata=True,
+    target_accept=0.9,
 )
 
 # %% diagnostics
 
-az.summary(inference_data, var_names=[
-    "beta",
-    "delta",
-    "gamma",
-    "theta_lreco",
-    "theta_galtan",
-    "theta_ecol"
-    ])
+_hcm_vars = ["beta", "delta", "gamma", "theta_lreco", "theta_galtan", "theta_ecol"]
 
-az.plot_trace(inference_data, var_names=[
-    "beta",
-    "delta",
-    "gamma",
-    "theta_lreco",
-    "theta_galtan",
-    "theta_ecol"
-    ])
+az.summary(inference_data, var_names=_hcm_vars).to_csv(f"{_out_data}_summary.csv")
 
-# az.plot_dist(inference_data, var_names=[
-#     "beta",
-#     "delta",
-#     "theta_lreco",
-#     "theta_galtan",
-#     "theta_ecol"
-#     ])
+for var in _hcm_vars:
+    az.plot_trace(inference_data, var_names=[var])
+    plt.savefig(f"{_out_ql}_trace_{var}.png", bbox_inches="tight")
+    plt.close("all")
 
-az.plot_forest(inference_data, var_names=["beta"], combined=True)
-az.plot_forest(inference_data, var_names=["delta"], combined=True)
-az.plot_forest(inference_data, var_names=["gamma"], combined=True)
-az.plot_forest(inference_data, var_names=["theta_lreco"], combined=True)
-az.plot_forest(inference_data, var_names=["theta_galtan"], combined=True)
-az.plot_forest(inference_data, var_names=["theta_ecol"], combined=True)
+for var in _hcm_vars:
+    az.plot_forest(inference_data, var_names=[var], combined=True)
+    plt.savefig(f"{_out_ql}_forest_{var}.png", bbox_inches="tight")
+    plt.close("all")
 
 # %% save to netcdf
 
-inference_data.to_netcdf("output/inference_hybrid_choice.nc")
+inference_data.to_netcdf(_output)
 
 # %%

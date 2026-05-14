@@ -1,0 +1,11 @@
+# Paths to raw survey data files, relative to the project root
+raw_data:
+  ch: raw_data/ccs_conjoint_CH_240225_1004.csv  # Switzerland
+  cn: raw_data/ccs_conjoint_CN_240225_1752.csv  # China
+
+# MCMC sampling settings — used by both choice models
+mcmc:
+  draws: 100   # posterior samples per chain to keep
+  tune: 100     # warmup steps per chain (discarded after sampling)
+  chains: 4     # number of independent Markov chains
+  cores: 4      # parallel processes; set equal to chains on most machines

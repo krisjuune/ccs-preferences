@@ -1,6 +1,26 @@
 import pandas as pd
 import numpy as np
-from scripts.preprocessing.translate_conjoints import apply_mapping
+
+
+def apply_mapping(df, mapping_dict, column_pattern=None):
+    if isinstance(column_pattern, str):
+        column_patterns = [column_pattern]
+    elif isinstance(column_pattern, list) and all(isinstance(pat, str) for pat in column_pattern):
+        column_patterns = column_pattern
+    elif column_pattern is None:
+        column_patterns = []
+    else:
+        raise ValueError("column_pattern should be a string, list of strings, or None.")
+
+    if column_patterns:
+        columns_to_map = [col for col in df.columns if any(pat in col for pat in column_patterns)]
+    else:
+        columns_to_map = df.columns
+
+    for column in columns_to_map:
+        df[column] = df[column].replace(mapping_dict)
+
+    return df
 
 # %%
 

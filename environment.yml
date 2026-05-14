@@ -1,0 +1,16 @@
+name: ccs-location
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.12
+  - pymc>=5.0
+  - arviz
+  - pandas
+  - numpy
+  - xarray
+  - pytensor
+  - netcdf4
+  - pip
+  - pip:
+    - snakemake
