@@ -191,10 +191,29 @@ with pm.Model(coords=coords) as hcm_model:
         dims=["task", "level"]
     )
 
-    # gamma coefficients: how much each latent trait moderates framing effects
-    theta_lreco = pm.Normal("theta_lreco", mu=0, sigma=1, dims="level")
-    theta_galtan = pm.Normal("theta_galtan", mu=0, sigma=1, dims="level")
-    theta_ecol = pm.Normal("theta_ecol", mu=0, sigma=1, dims="level")
+    # value moderation effects — same sum-to-zero constraint as beta and gamma:
+    # with all levels included, adding a constant per attribute cancels in
+    # U_left - U_right (sum of dummies per attribute = 1 for both options)
+    theta_lreco_raw = pm.Normal("theta_lreco_raw", mu=0, sigma=1, dims="level")
+    theta_lreco = pm.Deterministic(
+        "theta_lreco",
+        pt.concatenate([theta_lreco_raw[idx] - theta_lreco_raw[idx].mean() for idx in attr_slices]),
+        dims="level",
+    )
+
+    theta_galtan_raw = pm.Normal("theta_galtan_raw", mu=0, sigma=1, dims="level")
+    theta_galtan = pm.Deterministic(
+        "theta_galtan",
+        pt.concatenate([theta_galtan_raw[idx] - theta_galtan_raw[idx].mean() for idx in attr_slices]),
+        dims="level",
+    )
+
+    theta_ecol_raw = pm.Normal("theta_ecol_raw", mu=0, sigma=1, dims="level")
+    theta_ecol = pm.Deterministic(
+        "theta_ecol",
+        pt.concatenate([theta_ecol_raw[idx] - theta_ecol_raw[idx].mean() for idx in attr_slices]),
+        dims="level",
+    )
     
     # choice model: main effects — sum-to-zero within each attribute so beta =
     # deviation from attribute mean rather than from an arbitrary baseline
