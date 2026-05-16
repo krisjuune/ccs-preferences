@@ -60,15 +60,15 @@ socio_ecol_list = [
 value_columns = socio_econ_list + socio_cult_list + socio_ecol_list
 
 reversed_scale_list = [
-    "lreco_1", 
+    "lreco_1",
     "galtan_1",
     "galtan_2",
     "net_zero_question",
-    "socio_ecological_1"
+    "socio_ecological_2"   # "Man destined to dominate nature" — anti-env, reversed so high = pro-env
 ]
 
-five_point_reversed_list = [
-    "climate_worried"
+five_point_list = [
+    "climate_worried"      # "How worried?" — high worry = pro-env, so normal (not reversed)
 ]
 
 likert_values_value_ques = [
@@ -102,17 +102,17 @@ likert_values_five = [
 ]
 
 numerical_values_normalised = [0, 0.2, 0.4, 0.6, 0.8, 1]
-numerical_values_reversed =  [1, 0.8, 0.6, 0.4, 0.2, 0]
-numerical_values_five = [1, 0.75, 0.5, 0.25, 0]
+numerical_values_reversed  = [1, 0.8, 0.6, 0.4, 0.2, 0]
+numerical_values_five      = [0, 0.25, 0.5, 0.75, 1]   # not worried → 0, extremely worried → 1
 
-values_dict = {**dict(np.array(list(zip(likert_values_value_ques, numerical_values_normalised))))}
+values_dict          = {**dict(np.array(list(zip(likert_values_value_ques, numerical_values_normalised))))}
 values_dict_reversed = {**dict(np.array(list(zip(likert_values_value_ques, numerical_values_reversed))))}
-values_dict_five = {**dict(np.array(list(zip(likert_values_five, numerical_values_five))))}
+values_dict_five     = {**dict(np.array(list(zip(likert_values_five, numerical_values_five))))}
 
 def get_values_dict(column_name):
     if column_name in reversed_scale_list:
         return values_dict_reversed
-    elif column_name in five_point_reversed_list:
+    elif column_name in five_point_list:
         return values_dict_five
     else:
         return values_dict
