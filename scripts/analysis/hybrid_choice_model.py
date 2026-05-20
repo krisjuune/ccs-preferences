@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 try:
     _mcmc   = snakemake.config["mcmc"]
+    _seed   = _mcmc["seed"]
     _draws  = _mcmc["draws"]
     _tune   = _mcmc["tune"]
     _chains = _mcmc["chains"]
@@ -14,6 +15,7 @@ try:
     _coding = snakemake.config.get("coding", "sum_to_zero")
     _output = snakemake.output[0]
 except NameError:
+    _seed = 42
     _draws, _tune, _chains, _cores = 250, 250, 4, 4
     _coding = "sum_to_zero"
     _output = "output/data/inference_hybrid_choice.nc"
@@ -288,7 +290,7 @@ with pm.Model(coords=coords) as hcm_model:
 priors = pm.sample_prior_predictive(
     draws=1000,
     model=hcm_model,
-    random_seed=42,
+    random_seed=_seed,
 )
 
 # %% check priors
@@ -308,7 +310,7 @@ inference_data = pm.sample(
     tune=_tune,
     chains=_chains,
     cores=_cores,
-    random_seed=42,
+    random_seed=_seed,
     return_inferencedata=True,
     target_accept=0.9,
 )

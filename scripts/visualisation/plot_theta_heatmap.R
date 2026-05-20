@@ -4,8 +4,12 @@ library(yaml)
 
 # ---- coding setting ----
 
-config <- read_yaml("config.yaml")
-coding <- config$coding
+config    <- read_yaml("config.yaml")
+coding    <- config$coding
+plt       <- config$plots
+ci_width  <- plt$ci_width
+base_size <- plt$base_size
+dpi_val   <- plt$dpi
 
 baseline_level_names <- c(
   "attr_engagement_inform",
@@ -102,8 +106,8 @@ theta_summary <- theta |>
   group_by(dim, level) |>
   summarise(
     mean  = mean(value),
-    lower = quantile(value, 0.05),
-    upper = quantile(value, 0.95),
+    lower = quantile(value, (1 - ci_width) / 2),
+    upper = quantile(value, 1 - (1 - ci_width) / 2),
     .groups = "drop"
   ) |>
   mutate(
@@ -160,7 +164,7 @@ ggplot(theta_summary, aes(x = dim_label, y = level_base)) +
     drop   = FALSE
   ) +
   labs(x = NULL, y = NULL) +
-  theme_classic(base_size = 14) +
+  theme_classic(base_size = base_size) +
   theme(
     axis.text.y     = element_markdown(lineheight = 1.2),
     axis.text.x     = element_text(face = "bold", size = 13),
@@ -171,5 +175,5 @@ ggplot(theta_summary, aes(x = dim_label, y = level_base)) +
 
 ggsave(
   "output/plots/theta_heatmap.png",
-  width = 9, height = 10, dpi = 300, bg = "white"
+  width = 9, height = 10, dpi = dpi_val, bg = "white"
 )

@@ -5,8 +5,18 @@ library(yaml)
 
 # ---- coding setting ----
 
-config <- read_yaml("config.yaml")
-coding <- config$coding
+config       <- read_yaml("config.yaml")
+coding       <- config$coding
+plt          <- config$plots
+attr_colours <- unlist(plt$attr_colours)
+slab_alpha   <- plt$slab_alpha
+slab_alpha_f <- plt$slab_alpha_framing
+point_size   <- plt$point_size
+point_alpha  <- plt$point_alpha
+ci_width     <- plt$ci_width
+base_size    <- plt$base_size
+dpi_val      <- plt$dpi
+sp_light     <- plt$sp_source_light
 
 # baseline level names (one per attribute, fixed to 0 under reference_level coding)
 baseline_level_names <- c(
@@ -40,15 +50,6 @@ attr_display <- c(
   "attr_costs"          = "Cost responsibility",
   "attr_reason"         = "Location reason",
   "attr_source_purpose" = "Source / Purpose"
-)
-
-attr_colours <- c(
-  "attr_engagement"     = "#4e79a7",
-  "attr_vicinity"       = "#f28e2b",
-  "attr_industry"       = "#e15759",
-  "attr_costs"          = "#76b7b2",
-  "attr_reason"         = "#59a14f",
-  "attr_source_purpose" = "#b07aa1"
 )
 
 # ---- level labels (keyed on base level name, no framing suffix) ----
@@ -195,22 +196,22 @@ ggplot(
 ) +
   stat_halfeye(
     data           = \(d) filter(d, framing != "purpose"),
-    slab_alpha     = 0.3,
-    point_alpha    = 0.9,
-    interval_alpha = 0.9,
-    point_size     = 4,
-    .width         = 0.9,
+    slab_alpha     = slab_alpha_f,
+    point_alpha    = point_alpha,
+    interval_alpha = point_alpha,
+    point_size     = point_size,
+    .width         = ci_width,
     point_interval = median_hdi,
     slab_colour    = NA,
     na.rm          = TRUE
   ) +
   stat_halfeye(
     data           = \(d) filter(d, framing == "purpose"),
-    slab_alpha     = 0.6,
-    point_alpha    = 0.9,
-    interval_alpha = 0.9,
-    point_size     = 4,
-    .width         = 0.9,
+    slab_alpha     = slab_alpha,
+    point_alpha    = point_alpha,
+    interval_alpha = point_alpha,
+    point_size     = point_size,
+    .width         = ci_width,
     point_interval = median_hdi,
     slab_colour    = NA,
     na.rm          = TRUE
@@ -220,7 +221,7 @@ ggplot(
     geom_point(
       data  = baseline_df,
       aes(x = 0, y = level_base, colour = fill_group),
-      size  = 4, shape = 19, na.rm = TRUE,
+      size  = point_size, shape = 19, na.rm = TRUE,
       inherit.aes = FALSE
     )} +
   scale_y_discrete(
@@ -238,7 +239,7 @@ ggplot(
     guide    = guide_legend(
       nrow         = 1,
       override.aes = list(
-        fill   = c("#f28e2b", "#e7d7e3", "#b07aa1"),
+        fill   = c(attr_colours["attr_vicinity"], sp_light, attr_colours["attr_source_purpose"]),
         alpha  = c(0.7, 1.0, 0.7),
         colour = NA,
         size   = 5
@@ -265,7 +266,7 @@ ggplot(
     )
   ) +
   labs(x = "Partworth utility", y = NULL) +
-  theme_classic(base_size = 14) +
+  theme_classic(base_size = base_size) +
   theme(
     axis.text.y          = element_markdown(lineheight = 1.2),
     panel.grid.major.x   = element_line(color = "grey92", linewidth = 0.4),
@@ -276,4 +277,4 @@ ggplot(
     legend.box.just      = "left"
   )
 
-ggsave("output/plots/partworths.png", width = 10, height = 10, dpi = 300, bg = "white")
+ggsave("output/plots/partworths.png", width = 10, height = 10, dpi = dpi_val, bg = "white")

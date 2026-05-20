@@ -5,8 +5,16 @@ library(yaml)
 
 # ---- coding setting ----
 
-config <- read_yaml("config.yaml")
-coding <- config$coding
+config       <- read_yaml("config.yaml")
+coding       <- config$coding
+plt          <- config$plots
+attr_colours <- unlist(plt$attr_colours)
+slab_alpha   <- plt$slab_alpha
+point_size   <- plt$point_size
+point_alpha  <- plt$point_alpha
+ci_width     <- plt$ci_width
+base_size    <- plt$base_size
+dpi_val      <- plt$dpi
 
 baseline_level_names <- c(
   "attr_engagement_inform",
@@ -39,15 +47,6 @@ attr_display <- c(
   "attr_costs"          = "Cost responsibility",
   "attr_reason"         = "Location reason",
   "attr_source_purpose" = "Source / Purpose"
-)
-
-attr_colours <- c(
-  "attr_engagement"     = "#4e79a7",
-  "attr_vicinity"       = "#f28e2b",
-  "attr_industry"       = "#e15759",
-  "attr_costs"          = "#76b7b2",
-  "attr_reason"         = "#59a14f",
-  "attr_source_purpose" = "#b07aa1"
 )
 
 level_display <- c(
@@ -154,9 +153,9 @@ baseline_df <- if (coding == "reference_level") {
 
 ggplot(plot_data, aes(x = value, y = level_base, fill = attribute, colour = attribute)) +
   stat_halfeye(
-    slab_alpha     = 0.6,
-    point_size     = 4,
-    .width         = 0.9,
+    slab_alpha     = slab_alpha,
+    point_size     = point_size,
+    .width         = ci_width,
     point_interval = median_hdi,
     slab_colour    = NA,
     na.rm          = TRUE
@@ -166,7 +165,7 @@ ggplot(plot_data, aes(x = value, y = level_base, fill = attribute, colour = attr
     geom_point(
       data  = baseline_df,
       aes(x = 0, y = level_base, colour = attribute),
-      size  = 4, shape = 19, na.rm = TRUE,
+      size  = point_size, shape = 19, na.rm = TRUE,
       inherit.aes = FALSE
     )} +
   scale_y_discrete(
@@ -189,7 +188,7 @@ ggplot(plot_data, aes(x = value, y = level_base, fill = attribute, colour = attr
   scale_colour_manual(values = attr_colours, na.value = NA, guide = "none") +
   facet_wrap(~ dim_label, ncol = 3) +
   labs(x = "Value moderation effect (θ)", y = NULL) +
-  theme_classic(base_size = 14) +
+  theme_classic(base_size = base_size) +
   theme(
     axis.text.y          = element_markdown(lineheight = 1.2),
     panel.grid.major.x   = element_line(color = "grey92", linewidth = 0.4),
@@ -202,5 +201,5 @@ ggplot(plot_data, aes(x = value, y = level_base, fill = attribute, colour = attr
 
 ggsave(
   "output/plots/theta_forest.png",
-  width = 20, height = 10, dpi = 300, bg = "white"
+  width = 20, height = 10, dpi = dpi_val, bg = "white"
 )

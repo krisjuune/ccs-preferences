@@ -10,7 +10,26 @@ coding: "reference_level"
 
 # MCMC sampling settings — used by both choice models
 mcmc:
-  draws: 100   # posterior samples per chain to keep
-  tune: 100     # warmup steps per chain (discarded after sampling)
-  chains: 4     # number of independent Markov chains
-  cores: 4      # parallel processes; set equal to chains on most machines
+  seed: 42
+  draws: 100
+  tune: 100
+  chains: 4
+  cores: 4
+
+# Plot visual settings — shared across all visualisation scripts
+plots:
+  base_size: 14
+  dpi: 300
+  ci_width: 0.9
+  point_size: 4
+  point_alpha: 0.9
+  slab_alpha: 0.6
+  slab_alpha_framing: 0.3
+  sp_source_light: "#e7d7e3" 
+  attr_colours:
+    attr_engagement:     "#4e79a7"
+    attr_vicinity:       "#f28e2b"
+    attr_industry:       "#e15759"
+    attr_costs:          "#76b7b2"
+    attr_reason:         "#59a14f"
+    attr_source_purpose: "#b07aa1"
