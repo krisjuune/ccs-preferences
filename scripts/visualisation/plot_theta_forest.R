@@ -1,6 +1,21 @@
 library(tidyverse)
 library(ggdist)
 library(ggtext)
+library(yaml)
+
+# ---- coding setting ----
+
+config <- read_yaml("config.yaml")
+coding <- config$coding
+
+baseline_level_names <- c(
+  "attr_engagement_inform",
+  "attr_vicinity_abroad",
+  "attr_industry_waste incineration",
+  "attr_costs_taxpayer",
+  "attr_reason_sparsely-populated",
+  "attr_source_purpose_domestic"
+)
 
 # ---- load data ----
 
@@ -9,19 +24,19 @@ theta <- read_csv("output/data/posteriors_theta.csv")
 # ---- attribute setup (shared with other plot scripts) ----
 
 attr_order <- c(
-  "attr_engagement",
   "attr_vicinity",
+  "attr_source_purpose",
   "attr_industry",
   "attr_costs",
   "attr_reason",
-  "attr_source_purpose"
+  "attr_engagement"
 )
 
 attr_display <- c(
   "attr_engagement"     = "Engagement",
   "attr_vicinity"       = "Vicinity",
   "attr_industry"       = "Industry",
-  "attr_costs"          = "Costs",
+  "attr_costs"          = "Cost responsibility",
   "attr_reason"         = "Location reason",
   "attr_source_purpose" = "Source / Purpose"
 )
@@ -121,34 +136,68 @@ header_rows <- crossing(
 plot_data <- bind_rows(plot_data, header_rows) |>
   mutate(level_base = factor(level_base, levels = y_struct$levels))
 
+# baseline rows (reference_level only): dot at x=0 per value dimension
+baseline_df <- if (coding == "reference_level") {
+  crossing(
+    tibble(
+      level_base = factor(baseline_level_names, levels = y_struct$levels),
+      attribute  = sapply(baseline_level_names, get_attribute)
+    ),
+    tibble(
+      dim       = factor(dim_order, levels = dim_order),
+      dim_label = unname(dim_labels)
+    )
+  )
+} else NULL
+
 # ---- plot ----
 
 ggplot(plot_data, aes(x = value, y = level_base, fill = attribute, colour = attribute)) +
   stat_halfeye(
     slab_alpha     = 0.6,
-    point_size     = 3,
+    point_size     = 4,
     .width         = 0.9,
     point_interval = median_hdi,
     slab_colour    = NA,
     na.rm          = TRUE
   ) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "grey40", linewidth = 0.5) +
+  {if (!is.null(baseline_df))
+    geom_point(
+      data  = baseline_df,
+      aes(x = 0, y = level_base, colour = attribute),
+      size  = 4, shape = 19, na.rm = TRUE,
+      inherit.aes = FALSE
+    )} +
   scale_y_discrete(
     labels = y_struct$labels,
     limits = rev(y_struct$levels),
     drop   = FALSE
   ) +
-  scale_fill_manual(values = attr_colours, na.value = NA, guide = "none") +
+  scale_fill_manual(
+    name     = NULL,
+    values   = attr_colours,
+    labels   = attr_display[names(attr_colours)],
+    breaks   = names(attr_colours),
+    na.value = NA,
+    guide    = guide_legend(
+      nrow         = 1,
+      override.aes = list(alpha = 0.7, colour = NA, size = 5),
+      order = 1
+    )
+  ) +
   scale_colour_manual(values = attr_colours, na.value = NA, guide = "none") +
   facet_wrap(~ dim_label, ncol = 3) +
   labs(x = "Value moderation effect (θ)", y = NULL) +
   theme_classic(base_size = 14) +
   theme(
-    axis.text.y        = element_markdown(lineheight = 1.2),
-    panel.grid.major.x = element_line(color = "grey92", linewidth = 0.4),
-    strip.text         = element_text(face = "bold", size = 14),
-    strip.background   = element_blank(),
-    plot.margin        = margin(10, 20, 10, 10)
+    axis.text.y          = element_markdown(lineheight = 1.2),
+    panel.grid.major.x   = element_line(color = "grey92", linewidth = 0.4),
+    strip.text           = element_text(face = "bold", size = 14),
+    strip.background     = element_blank(),
+    plot.margin          = margin(10, 20, 10, 10),
+    legend.position      = "bottom",
+    legend.justification = "center"
   )
 
 ggsave(

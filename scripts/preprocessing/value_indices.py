@@ -64,11 +64,11 @@ reversed_scale_list = [
     "galtan_1",
     "galtan_2",
     "net_zero_question",
-    "socio_ecological_2"   # "Man destined to dominate nature" — anti-env, reversed so high = pro-env
+    "socio_ecological_2"
 ]
 
 five_point_list = [
-    "climate_worried"      # "How worried?" — high worry = pro-env, so normal (not reversed)
+    "climate_worried"
 ]
 
 likert_values_value_ques = [

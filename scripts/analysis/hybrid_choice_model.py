@@ -6,14 +6,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 try:
-    _mcmc = snakemake.config["mcmc"]
-    _draws = _mcmc["draws"]
-    _tune = _mcmc["tune"]
+    _mcmc   = snakemake.config["mcmc"]
+    _draws  = _mcmc["draws"]
+    _tune   = _mcmc["tune"]
     _chains = _mcmc["chains"]
-    _cores = _mcmc["cores"]
+    _cores  = _mcmc["cores"]
+    _coding = snakemake.config.get("coding", "sum_to_zero")
     _output = snakemake.output[0]
 except NameError:
     _draws, _tune, _chains, _cores = 250, 250, 4, 4
+    _coding = "sum_to_zero"
     _output = "output/data/inference_hybrid_choice.nc"
 
 _model_name = os.path.splitext(os.path.basename(_output))[0]
@@ -62,35 +64,40 @@ for attr in attributes:
                               [level for level in df[attr].unique() if level != baseline], 
                               ordered=True)
 
-# generate dummies with all levels (no baseline dropped)
-dummies = pd.get_dummies(df[attributes], drop_first=False)
-
-# reorder columns: baseline first, then remaining levels, for each attribute
-ordered_columns = []
-for attr in attributes:
-    baseline_col = f"{attr}_{baseline_dict[attr]}"
-    attr_columns  = [col for col in dummies.columns if col.startswith(attr)]
-    ordered_columns.append(baseline_col)
-    ordered_columns.extend([col for col in attr_columns if col != baseline_col])
-
-dummies = dummies[ordered_columns]
-dummies = dummies.loc[:, ~dummies.columns.duplicated()]
-
-# per-attribute index groups for sum-to-zero constraint on beta
-level_names = dummies.columns.tolist()
-attr_slices = [
-    [i for i, col in enumerate(level_names) if col.startswith(attr)]
-    for attr in attributes
-]
-
-# framing contrast for attr_source_purpose: -0.5 for baseline (domestic), +0.5 for others
-# sums to zero across levels, consistent with the sum-to-zero constraint on beta
-sp_baseline_col = f"attr_source_purpose_{baseline_dict['attr_source_purpose']}"
-sp_contrast = np.array([
-    -0.5 if col == sp_baseline_col else
-    (0.5 if col.startswith("attr_source_purpose") else 0.0)
-    for col in dummies.columns
-])
+if _coding == "sum_to_zero":
+    # all levels included; baselines ordered first within each attribute
+    dummies = pd.get_dummies(df[attributes], drop_first=False)
+    ordered_columns = []
+    for attr in attributes:
+        baseline_col = f"{attr}_{baseline_dict[attr]}"
+        attr_cols    = [col for col in dummies.columns if col.startswith(attr)]
+        ordered_columns.append(baseline_col)
+        ordered_columns.extend([col for col in attr_cols if col != baseline_col])
+    dummies = dummies[ordered_columns].loc[:, lambda d: ~d.columns.duplicated()]
+    level_names = dummies.columns.tolist()
+    attr_slices = [
+        [i for i, col in enumerate(level_names) if col.startswith(attr)]
+        for attr in attributes
+    ]
+    # framing contrast: ±0.5 so framing sums to zero across source_purpose levels
+    sp_baseline_col = f"attr_source_purpose_{baseline_dict['attr_source_purpose']}"
+    sp_contrast = np.array([
+        -0.5 if col == sp_baseline_col else
+        (0.5 if col.startswith("attr_source_purpose") else 0.0)
+        for col in dummies.columns
+    ])
+else:
+    # reference_level: baseline dropped, non-baseline levels in attribute order
+    dummies = pd.get_dummies(df[attributes], drop_first=True)
+    ordered_columns = []
+    for attr in attributes:
+        ordered_columns.extend([col for col in dummies.columns if col.startswith(attr)])
+    dummies = dummies[ordered_columns].loc[:, lambda d: ~d.columns.duplicated()]
+    # framing mask: 1 for the remaining (non-baseline) source_purpose level, 0 elsewhere
+    sp_contrast = np.array([
+        1.0 if col.startswith("attr_source_purpose") else 0.0
+        for col in dummies.columns
+    ])
 
 df["framing"] = df["framing"].astype("category")
 df["country"] = df["country"].astype("category")
@@ -191,57 +198,65 @@ with pm.Model(coords=coords) as hcm_model:
         dims=["task", "level"]
     )
 
-    # value moderation effects — same sum-to-zero constraint as beta and gamma:
-    # with all levels included, adding a constant per attribute cancels in
-    # U_left - U_right (sum of dummies per attribute = 1 for both options)
-    theta_lreco_raw = pm.Normal("theta_lreco_raw", mu=0, sigma=1, dims="level")
-    theta_lreco = pm.Deterministic(
-        "theta_lreco",
-        pt.concatenate([theta_lreco_raw[idx] - theta_lreco_raw[idx].mean() for idx in attr_slices]),
-        dims="level",
-    )
-
-    theta_galtan_raw = pm.Normal("theta_galtan_raw", mu=0, sigma=1, dims="level")
-    theta_galtan = pm.Deterministic(
-        "theta_galtan",
-        pt.concatenate([theta_galtan_raw[idx] - theta_galtan_raw[idx].mean() for idx in attr_slices]),
-        dims="level",
-    )
-
-    theta_ecol_raw = pm.Normal("theta_ecol_raw", mu=0, sigma=1, dims="level")
-    theta_ecol = pm.Deterministic(
-        "theta_ecol",
-        pt.concatenate([theta_ecol_raw[idx] - theta_ecol_raw[idx].mean() for idx in attr_slices]),
-        dims="level",
-    )
-    
-    # choice model: main effects — sum-to-zero within each attribute so beta =
-    # deviation from attribute mean rather than from an arbitrary baseline
-    beta_raw = pm.Normal("beta_raw", mu=0, sigma=2, dims="level")
-    beta = pm.Deterministic(
-        "beta",
-        pt.concatenate([beta_raw[idx] - beta_raw[idx].mean() for idx in attr_slices]),
-        dims="level",
-    )
+    if _coding == "sum_to_zero":
+        # value moderation: sum-to-zero per attribute (all levels included)
+        theta_lreco_raw = pm.Normal("theta_lreco_raw", mu=0, sigma=1, dims="level")
+        theta_lreco = pm.Deterministic(
+            "theta_lreco",
+            pt.concatenate([theta_lreco_raw[idx] - theta_lreco_raw[idx].mean() for idx in attr_slices]),
+            dims="level",
+        )
+        theta_galtan_raw = pm.Normal("theta_galtan_raw", mu=0, sigma=1, dims="level")
+        theta_galtan = pm.Deterministic(
+            "theta_galtan",
+            pt.concatenate([theta_galtan_raw[idx] - theta_galtan_raw[idx].mean() for idx in attr_slices]),
+            dims="level",
+        )
+        theta_ecol_raw = pm.Normal("theta_ecol_raw", mu=0, sigma=1, dims="level")
+        theta_ecol = pm.Deterministic(
+            "theta_ecol",
+            pt.concatenate([theta_ecol_raw[idx] - theta_ecol_raw[idx].mean() for idx in attr_slices]),
+            dims="level",
+        )
+        # main effects: sum-to-zero per attribute
+        beta_raw = pm.Normal("beta_raw", mu=0, sigma=2, dims="level")
+        beta = pm.Deterministic(
+            "beta",
+            pt.concatenate([beta_raw[idx] - beta_raw[idx].mean() for idx in attr_slices]),
+            dims="level",
+        )
+    else:
+        # value moderation: unconstrained (baseline anchors identification)
+        theta_lreco = pm.Normal("theta_lreco", mu=0, sigma=1, dims="level")
+        theta_galtan = pm.Normal("theta_galtan", mu=0, sigma=1, dims="level")
+        theta_ecol   = pm.Normal("theta_ecol",   mu=0, sigma=1, dims="level")
+        # main effects: unconstrained relative to dropped baseline
+        beta = pm.Normal("beta", mu=0, sigma=2, dims="level")
 
     # framing effect on attr_source_purpose only (scalar — one attribute is framed)
     delta = pm.Normal("delta", mu=0, sigma=1)
 
-    # country effect — two zero-sum constraints:
-    # 1. across countries per level (so beta = true average across countries)
-    # 2. across levels within each attribute per country (needed because all
-    #    levels are included and adding a constant per attribute cancels in U_left - U_right)
     gamma_raw = pm.Normal("gamma_raw", mu=0, sigma=1, dims=["country", "level"])
-    gamma_cc  = gamma_raw - gamma_raw.mean(axis=0)
-    gamma = pm.Deterministic(
-        "gamma",
-        pt.concatenate(
-            [gamma_cc[:, idx] - gamma_cc[:, idx].mean(axis=1, keepdims=True)
-             for idx in attr_slices],
-            axis=1,
-        ),
-        dims=["country", "level"],
-    )
+    if _coding == "sum_to_zero":
+        # two zero-sum constraints: across countries per level, and across
+        # levels per attribute per country (both needed when all levels included)
+        gamma_cc = gamma_raw - gamma_raw.mean(axis=0)
+        gamma = pm.Deterministic(
+            "gamma",
+            pt.concatenate(
+                [gamma_cc[:, idx] - gamma_cc[:, idx].mean(axis=1, keepdims=True)
+                 for idx in attr_slices],
+                axis=1,
+            ),
+            dims=["country", "level"],
+        )
+    else:
+        # reference_level: only across-country zero-sum needed (baseline anchors levels)
+        gamma = pm.Deterministic(
+            "gamma",
+            gamma_raw - gamma_raw.mean(axis=0),
+            dims=["country", "level"],
+        )
 
     beta_modulated = (
         beta

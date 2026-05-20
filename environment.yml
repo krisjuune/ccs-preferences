@@ -15,6 +15,7 @@ dependencies:
   - r-tidyverse
   - r-ggdist
   - r-ggtext
+  - r-yaml
   - pip
   - pip:
     - snakemake

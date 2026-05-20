@@ -1,5 +1,20 @@
 library(tidyverse)
 library(ggtext)
+library(yaml)
+
+# ---- coding setting ----
+
+config <- read_yaml("config.yaml")
+coding <- config$coding
+
+baseline_level_names <- c(
+  "attr_engagement_inform",
+  "attr_vicinity_abroad",
+  "attr_industry_waste incineration",
+  "attr_costs_taxpayer",
+  "attr_reason_sparsely-populated",
+  "attr_source_purpose_domestic"
+)
 
 # ---- load data ----
 
@@ -8,19 +23,19 @@ theta <- read_csv("output/data/posteriors_theta.csv")
 # ---- attribute setup (shared with other plot scripts) ----
 
 attr_order <- c(
-  "attr_engagement",
   "attr_vicinity",
+  "attr_source_purpose",
   "attr_industry",
   "attr_costs",
   "attr_reason",
-  "attr_source_purpose"
+  "attr_engagement"
 )
 
 attr_display <- c(
   "attr_engagement"     = "Engagement",
   "attr_vicinity"       = "Vicinity",
   "attr_industry"       = "Industry",
-  "attr_costs"          = "Costs",
+  "attr_costs"          = "Cost responsibility",
   "attr_reason"         = "Location reason",
   "attr_source_purpose" = "Source / Purpose"
 )
@@ -92,12 +107,26 @@ theta_summary <- theta |>
     .groups = "drop"
   ) |>
   mutate(
-    # tile is fully opaque when the 90% CI excludes zero
-    credible  = lower > 0 | upper < 0,
+    credible   = lower > 0 | upper < 0,
     tile_alpha = if_else(credible, 1.0, 0.3),
     dim_label  = factor(dim_labels[dim], levels = unname(dim_labels)),
     level_base = factor(level, levels = y_struct$levels)
   )
+
+# add baseline rows at 0 when using reference_level coding
+if (coding == "reference_level") {
+  baseline_rows <- crossing(
+    tibble(level = baseline_level_names[baseline_level_names %in% names(level_display)]),
+    tibble(dim = dim_order)
+  ) |>
+    mutate(
+      mean       = 0, lower = 0, upper = 0,
+      credible   = FALSE, tile_alpha = 0.3,
+      dim_label  = factor(dim_labels[dim], levels = unname(dim_labels)),
+      level_base = factor(level, levels = y_struct$levels)
+    )
+  theta_summary <- bind_rows(theta_summary, baseline_rows)
+}
 
 # ---- plot ----
 # header rows have no tile data — scale_y_discrete(drop=FALSE) keeps them

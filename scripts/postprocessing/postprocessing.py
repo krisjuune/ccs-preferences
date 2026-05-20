@@ -37,7 +37,13 @@ def extract_beta(posterior, model_name):
     # source_purpose levels in order — first is the baseline (domestic, contrast=-0.5),
     # rest are non-baseline (foreign, contrast=+0.5)
     sp_levels = [l for l in beta.level.values if "source_purpose" in str(l)]
-    sp_contrast = {str(l): (-0.5 if i == 0 else 0.5) for i, l in enumerate(sp_levels)}
+    # sum_to_zero: both domestic (i=0, contrast=-0.5) and foreign (contrast=+0.5) present
+    # reference_level: only foreign present → full contrast of 1.0
+    sp_contrast = (
+        {str(l): (-0.5 if i == 0 else 0.5) for i, l in enumerate(sp_levels)}
+        if len(sp_levels) > 1 else
+        {str(l): 1.0 for l in sp_levels}
+    )
 
     framing_rows = []
     n_chains  = len(beta.chain)

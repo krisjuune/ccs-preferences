@@ -3,6 +3,11 @@ raw_data:
   ch: raw_data/ccs_conjoint_CH_240225_1004.csv  # Switzerland
   cn: raw_data/ccs_conjoint_CN_240225_1752.csv  # China
 
+# Attribute coding for the hybrid choice model
+# "sum_to_zero": all levels included, each beta = deviation from attribute mean
+# "reference_level": baseline level dropped, each beta = deviation from baseline
+coding: "reference_level"
+
 # MCMC sampling settings — used by both choice models
 mcmc:
   draws: 100   # posterior samples per chain to keep
