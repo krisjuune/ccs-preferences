@@ -3,6 +3,9 @@ raw_data:
   ch: raw_data/ccs_conjoint_CH_240225_1004.csv  # Switzerland
   cn: raw_data/ccs_conjoint_CN_240225_1752.csv  # China
 
+# Set to false to skip the basic choice model and run only the HCM
+run_basic_model: false
+
 # Attribute coding for the hybrid choice model
 # "sum_to_zero": all levels included, each beta = deviation from attribute mean
 # "reference_level": baseline level dropped, each beta = deviation from baseline

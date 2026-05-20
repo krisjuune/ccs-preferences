@@ -63,7 +63,10 @@ rule hybrid_choice_model:
 
 rule postprocess:
     input:
-        bcm="output/data/inference_basic_choice.nc",
+        bcm=(
+            "output/data/inference_basic_choice.nc"
+            if config.get("run_basic_model", True) else []
+        ),
         hcm="output/data/inference_hybrid_choice.nc",
     output:
         beta="output/data/posteriors_beta.csv",

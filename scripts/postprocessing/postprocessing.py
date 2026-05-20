@@ -4,17 +4,19 @@ import pandas as pd
 import numpy as np
 
 try:
-    bcm_path = snakemake.input.bcm
-    hcm_path = snakemake.input.hcm
-    out_beta = snakemake.output.beta
+    run_basic = snakemake.config.get("run_basic_model", True)
+    bcm_path  = snakemake.input.bcm if run_basic else None
+    hcm_path  = snakemake.input.hcm
+    out_beta    = snakemake.output.beta
     out_country = snakemake.output.country
-    out_theta = snakemake.output.theta
+    out_theta   = snakemake.output.theta
 except NameError:
-    bcm_path = "output/data/inference_basic_choice.nc"
-    hcm_path = "output/data/inference_hybrid_choice.nc"
-    out_beta = "output/data/posteriors_beta.csv"
+    run_basic = True
+    bcm_path  = "output/data/inference_basic_choice.nc"
+    hcm_path  = "output/data/inference_hybrid_choice.nc"
+    out_beta    = "output/data/posteriors_beta.csv"
     out_country = "output/data/posteriors_country.csv"
-    out_theta = "output/data/posteriors_theta.csv"
+    out_theta   = "output/data/posteriors_theta.csv"
 
 
 def extract_beta(posterior, model_name):
@@ -145,19 +147,21 @@ def extract_theta(posterior, model_name):
 
 
 # load inference data
-bcm = az.from_netcdf(bcm_path)
 hcm = az.from_netcdf(hcm_path)
 
-# extract and concatenate across models
-beta_all = pd.concat([
-    extract_beta(bcm.posterior, "basic"),
-    extract_beta(hcm.posterior, "hybrid"),
-], ignore_index=True)
-
-country_all = pd.concat([
-    extract_country(bcm.posterior, "basic"),
-    extract_country(hcm.posterior, "hybrid"),
-], ignore_index=True)
+if run_basic:
+    bcm = az.from_netcdf(bcm_path)
+    beta_all = pd.concat([
+        extract_beta(bcm.posterior, "basic"),
+        extract_beta(hcm.posterior, "hybrid"),
+    ], ignore_index=True)
+    country_all = pd.concat([
+        extract_country(bcm.posterior, "basic"),
+        extract_country(hcm.posterior, "hybrid"),
+    ], ignore_index=True)
+else:
+    beta_all    = extract_beta(hcm.posterior, "hybrid")
+    country_all = extract_country(hcm.posterior, "hybrid")
 
 # theta only exists in the hybrid model
 theta_all = extract_theta(hcm.posterior, "hybrid")
