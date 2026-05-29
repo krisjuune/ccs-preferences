@@ -45,7 +45,7 @@ attr_order <- c(
 
 attr_display <- c(
   "attr_engagement"     = "Engagement",
-  "attr_vicinity"       = "Vicinity",
+  "attr_vicinity"       = "Proximity",
   "attr_industry"       = "Industry",
   "attr_costs"          = "Cost responsibility",
   "attr_reason"         = "Location reason",
@@ -56,8 +56,8 @@ attr_display <- c(
 
 level_display <- c(
   "attr_engagement_inform"                     = "Inform",
-  "attr_engagement_vote"                       = "Vote",
   "attr_engagement_consult"                    = "Consult",
+  "attr_engagement_vote"                       = "Vote",
   "attr_vicinity_abroad"                       = "Abroad",
   "attr_vicinity_another region"               = "Another region",
   "attr_vicinity_your region"                  = "Your region",
@@ -155,7 +155,7 @@ row1_values <- c(
   "sp_purpose"    = "#b07aa1"   # same for rendering; legend key lightened via override.aes
 )
 row1_labels <- c(
-  "attr_vicinity" = "Vicinity",
+  "attr_vicinity" = "Proximity",
   "sp_source"     = "Source / Purpose (source framing)",
   "sp_purpose"    = "Source / Purpose (purpose framing)"
 )

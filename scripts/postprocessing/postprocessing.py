@@ -24,8 +24,15 @@ def extract_beta(posterior, model_name):
     Partworth utilities per attribute level.
 
     For all levels: posterior samples of beta (average across framings and
-    countries). For attr_source_purpose levels: also computes framing-adjusted
-    utilities (beta + delta * f) for f = -0.5 (source) and f = +0.5 (purpose).
+    countries). For attr_source_purpose non-baseline (foreign) levels: also
+    computes within-framing contrasts (foreign - domestic under the same
+    framing) for source and purpose framing conditions. Using within-framing
+    contrasts ensures the correct reference: foreign vs domestic when BOTH
+    are framed identically.
+
+    sum_to_zero: within-framing contrasts computed explicitly.
+    reference_level: domestic = 0 by construction, so the foreign utility
+    already is the within-framing contrast; no adjustment needed.
 
     Columns: model, level, framing, chain, draw, value
     """
@@ -36,11 +43,7 @@ def extract_beta(posterior, model_name):
     df["model"] = model_name
     df["framing"] = "average"
 
-    # source_purpose levels in order — first is the baseline (domestic, contrast=-0.5),
-    # rest are non-baseline (foreign, contrast=+0.5)
     sp_levels = [l for l in beta.level.values if "source_purpose" in str(l)]
-    # sum_to_zero: both domestic (i=0, contrast=-0.5) and foreign (contrast=+0.5) present
-    # reference_level: only foreign present → full contrast of 1.0
     sp_contrast = (
         {str(l): (-0.5 if i == 0 else 0.5) for i, l in enumerate(sp_levels)}
         if len(sp_levels) > 1 else
@@ -52,19 +55,44 @@ def extract_beta(posterior, model_name):
     n_draws   = len(beta.draw)
     chain_idx = np.repeat(beta.chain.values, n_draws)
     draw_idx  = np.tile(beta.draw.values, n_chains)
-    for level in sp_levels:
-        beta_sp  = beta.sel(level=level)
-        contrast = sp_contrast[str(level)]
-        for framing, f_val in [("purpose", -0.5), ("source", 0.5)]:
-            adjusted = (beta_sp + delta * contrast * f_val).values.ravel()
-            framing_rows.append(pd.DataFrame({
-                "chain":   chain_idx,
-                "draw":    draw_idx,
-                "level":   f"{level}_{framing}",
-                "value":   adjusted,
-                "model":   model_name,
-                "framing": framing,
-            }))
+
+    if len(sp_levels) > 1:
+        # sum_to_zero: within-framing contrast = foreign_framing - domestic_framing
+        domestic_l        = sp_levels[0]
+        domestic_contrast = sp_contrast[str(domestic_l)]  # -0.5
+        beta_dom          = beta.sel(level=domestic_l)
+
+        for level in sp_levels[1:]:  # non-baseline (foreign) levels only
+            beta_sp  = beta.sel(level=level)
+            contrast = sp_contrast[str(level)]
+            for framing, f_val in [("purpose", -0.5), ("source", 0.5)]:
+                within = (
+                    (beta_sp  + delta * contrast          * f_val) -
+                    (beta_dom + delta * domestic_contrast * f_val)
+                ).values.ravel()
+                framing_rows.append(pd.DataFrame({
+                    "chain":   chain_idx,
+                    "draw":    draw_idx,
+                    "level":   f"{level}_{framing}",
+                    "value":   within,
+                    "model":   model_name,
+                    "framing": framing,
+                }))
+    else:
+        # reference_level: domestic = 0 always; foreign utility is already the contrast
+        for level in sp_levels:
+            beta_sp  = beta.sel(level=level)
+            contrast = sp_contrast[str(level)]
+            for framing, f_val in [("purpose", -0.5), ("source", 0.5)]:
+                adjusted = (beta_sp + delta * contrast * f_val).values.ravel()
+                framing_rows.append(pd.DataFrame({
+                    "chain":   chain_idx,
+                    "draw":    draw_idx,
+                    "level":   f"{level}_{framing}",
+                    "value":   adjusted,
+                    "model":   model_name,
+                    "framing": framing,
+                }))
 
     if framing_rows:
         df = pd.concat([df] + framing_rows, ignore_index=True)
@@ -88,7 +116,12 @@ def extract_country(posterior, model_name):
     delta = posterior["delta"] # (chain, draw) — scalar
 
     sp_levels   = [l for l in beta.level.values if "source_purpose" in str(l)]
-    sp_contrast = {str(l): (-0.5 if i == 0 else 0.5) for i, l in enumerate(sp_levels)}
+    # fix: match extract_beta logic so reference_level gets contrast 1.0 not -0.5
+    sp_contrast = (
+        {str(l): (-0.5 if i == 0 else 0.5) for i, l in enumerate(sp_levels)}
+        if len(sp_levels) > 1 else
+        {str(l): 1.0 for l in sp_levels}
+    )
     n_chains    = len(beta.chain)
     n_draws     = len(beta.draw)
     chain_idx   = np.repeat(beta.chain.values, n_draws)
@@ -105,21 +138,46 @@ def extract_country(posterior, model_name):
         df["framing"] = "average"
         rows.append(df)
 
-        # Framing-adjusted rows for source_purpose levels
-        for level in sp_levels:
-            base_sp  = base.sel(level=level)
-            contrast = sp_contrast[str(level)]
-            for framing, f_val in [("purpose", -0.5), ("source", 0.5)]:
-                adjusted = (base_sp + delta * contrast * f_val).values.ravel()
-                rows.append(pd.DataFrame({
-                    "chain":   chain_idx,
-                    "draw":    draw_idx,
-                    "level":   f"{level}_{framing}",
-                    "value":   adjusted,
-                    "model":   model_name,
-                    "country": str(country),
-                    "framing": framing,
-                }))
+        # Within-framing contrasts for source_purpose levels
+        if len(sp_levels) > 1:
+            # sum_to_zero: within-framing contrast = foreign_framing - domestic_framing
+            domestic_l        = sp_levels[0]
+            domestic_contrast = sp_contrast[str(domestic_l)]
+            base_dom          = base.sel(level=domestic_l)
+
+            for level in sp_levels[1:]:
+                base_sp  = base.sel(level=level)
+                contrast = sp_contrast[str(level)]
+                for framing, f_val in [("purpose", -0.5), ("source", 0.5)]:
+                    within = (
+                        (base_sp  + delta * contrast          * f_val) -
+                        (base_dom + delta * domestic_contrast * f_val)
+                    ).values.ravel()
+                    rows.append(pd.DataFrame({
+                        "chain":   chain_idx,
+                        "draw":    draw_idx,
+                        "level":   f"{level}_{framing}",
+                        "value":   within,
+                        "model":   model_name,
+                        "country": str(country),
+                        "framing": framing,
+                    }))
+        else:
+            # reference_level: domestic = 0; foreign utility is already the contrast
+            for level in sp_levels:
+                base_sp  = base.sel(level=level)
+                contrast = sp_contrast[str(level)]
+                for framing, f_val in [("purpose", -0.5), ("source", 0.5)]:
+                    adjusted = (base_sp + delta * contrast * f_val).values.ravel()
+                    rows.append(pd.DataFrame({
+                        "chain":   chain_idx,
+                        "draw":    draw_idx,
+                        "level":   f"{level}_{framing}",
+                        "value":   adjusted,
+                        "model":   model_name,
+                        "country": str(country),
+                        "framing": framing,
+                    }))
 
     result = pd.concat(rows, ignore_index=True)
     return result[["model", "country", "level", "framing", "chain", "draw", "value"]]

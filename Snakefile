@@ -7,6 +7,8 @@ rule all:
         "output/plots/country_utilities.png",
         "output/plots/theta_forest.png",
         "output/plots/theta_heatmap.png",
+        "output/plots/value_distributions.png",
+        "output/tables/sample_description.tex",
 
 
 rule preprocess:
@@ -110,3 +112,22 @@ rule plot_theta_heatmap:
         "output/plots/theta_heatmap.png",
     shell:
         "Rscript scripts/visualisation/plot_theta_heatmap.R"
+
+
+rule plot_value_distributions:
+    input:
+        "data/data_values_ch_cn.csv",
+    output:
+        "output/plots/value_distributions.png",
+    shell:
+        "Rscript scripts/visualisation/plot_value_distributions.R"
+
+
+rule sample_description:
+    input:
+        ch="data/data_translated_ch.csv",
+        cn="data/data_translated_cn.csv",
+    output:
+        "output/tables/sample_description.tex",
+    shell:
+        "python scripts/tables/sample_description.py"
