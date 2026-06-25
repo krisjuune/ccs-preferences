@@ -13,6 +13,7 @@ rule all:
         "output/tables/sample_description.tex",
         "output/tables/value_correlations_ch.csv",
         "output/tables/value_correlations_cn.csv",
+        "output/plots/supp_figs/value_correlations.png",
 
 
 rule preprocess:
@@ -213,3 +214,13 @@ rule value_correlations:
         cn="output/tables/value_correlations_cn.csv",
     script:
         "scripts/analysis/value_correlations.py"
+
+
+rule plot_value_correlations:
+    input:
+        ch="output/tables/value_correlations_ch.csv",
+        cn="output/tables/value_correlations_cn.csv",
+    output:
+        "output/plots/supp_figs/value_correlations.png",
+    shell:
+        "Rscript scripts/visualisation/plot_value_correlations.R"
