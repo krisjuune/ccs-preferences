@@ -6,6 +6,10 @@ raw_data:
 # Set to false to skip the basic choice model and run only the HCM
 run_basic_model: false
 
+# Additional interaction models (off by default — long runtimes)
+run_interaction_model: true       # cherry-picked interactions, incl three-way with country
+run_full_interaction_model: false  # all pairwise attribute interactions
+
 # Attribute coding for the hybrid choice model
 # "sum_to_zero": all levels included, each beta = deviation from attribute mean
 # "reference_level": baseline level dropped, each beta = deviation from baseline
@@ -21,14 +25,17 @@ mcmc:
 
 # Plot visual settings — shared across all visualisation scripts
 plots:
-  base_size: 14
+  base_size: 14       # main text size for all figures
+  fig_width: 10        # standard width (inches) for single-panel figures
+  fig_width_wide: 14   # standard width (inches) for faceted/multi-panel figures
   dpi: 300
   ci_width: 0.9
   point_size: 4
   point_alpha: 0.9
   slab_alpha: 0.6
   slab_alpha_framing: 0.3
-  sp_source_light: "#e7d7e3" 
+  sp_source_light: "#e7d7e3"
+  # main six-colour scheme: one colour per conjoint attribute
   attr_colours:
     attr_engagement:     "#4e79a7"
     attr_vicinity:       "#f28e2b"
@@ -36,3 +43,13 @@ plots:
     attr_costs:          "#76b7b2"
     attr_reason:         "#59a14f"
     attr_source_purpose: "#b07aa1"
+  # three-colour scheme: one colour per latent value dimension
+  value_colours:
+    lreco:      "#4e79a7"
+    galtan:     "#f28e2b"
+    socio_ecol: "#59a14f"
+  # two-colour scheme: diverging gradient (e.g. theta heatmap)
+  diverging_colours:
+    low:  "#b07aa1"
+    mid:  "white"
+    high: "#59a14f"

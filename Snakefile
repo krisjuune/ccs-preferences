@@ -3,12 +3,16 @@ configfile: "config.yaml"
 
 rule all:
     input:
-        "output/plots/partworths.png",
-        "output/plots/country_utilities.png",
+        "output/plots/supp_figs/partworths.png",
+        "output/plots/supp_figs/country_direct.png",
+        "output/plots/country_total.png",
         "output/plots/theta_forest.png",
-        "output/plots/theta_heatmap.png",
+        "output/plots/supp_figs/theta_heatmap.png",
         "output/plots/value_distributions.png",
+        "output/plots/supp_figs/factor_loadings.png",
         "output/tables/sample_description.tex",
+        "output/tables/value_correlations_ch.csv",
+        "output/tables/value_correlations_cn.csv",
 
 
 rule preprocess:
@@ -63,6 +67,51 @@ rule hybrid_choice_model:
         "scripts/analysis/hybrid_choice_model.py"
 
 
+if config.get("run_interaction_model", False):
+    rule interaction_choice_model:
+        input:
+            "data/hcm_input.csv",
+        output:
+            "output/data/inference_interaction_choice.nc",
+        script:
+            "scripts/analysis/interaction_choice_model.py"
+
+    rule postprocess_interactions:
+        input:
+            idata="output/data/inference_interaction_choice.nc",
+        output:
+            coefs="output/data/posteriors_interact_coefs.csv",
+            conditional="output/data/posteriors_interact_conditional.csv",
+        script:
+            "scripts/postprocessing/postprocess_interactions.py"
+
+    rule plot_interact_forest:
+        input:
+            "output/data/posteriors_interact_coefs.csv",
+        output:
+            "output/plots/supp_figs/interact_forest_beta.png",
+        shell:
+            "Rscript scripts/visualisation/plot_interact_forest.R"
+
+    rule plot_interact_conditional:
+        input:
+            "output/data/posteriors_interact_conditional.csv",
+        output:
+            "output/plots/interact_proximity.png",
+        shell:
+            "Rscript scripts/visualisation/plot_interact_conditional.R"
+
+
+if config.get("run_full_interaction_model", False):
+    rule full_interaction_choice_model:
+        input:
+            "data/hcm_input.csv",
+        output:
+            "output/data/inference_full_interaction_choice.nc",
+        script:
+            "scripts/analysis/full_interaction_choice_model.py"
+
+
 rule postprocess:
     input:
         bcm=(
@@ -70,10 +119,13 @@ rule postprocess:
             if config.get("run_basic_model", True) else []
         ),
         hcm="output/data/inference_hybrid_choice.nc",
+        hcm_input="data/hcm_input.csv",
     output:
         beta="output/data/posteriors_beta.csv",
         country="output/data/posteriors_country.csv",
+        country_total="output/data/posteriors_country_total.csv",
         theta="output/data/posteriors_theta.csv",
+        loadings="output/data/posteriors_loadings.csv",
     script:
         "scripts/postprocessing/postprocessing.py"
 
@@ -82,18 +134,27 @@ rule plot_partworths:
     input:
         "output/data/posteriors_beta.csv",
     output:
-        "output/plots/partworths.png",
+        "output/plots/supp_figs/partworths.png",
     shell:
         "Rscript scripts/visualisation/plot_partworths.R"
 
 
-rule plot_country:
+rule plot_country_direct:
     input:
         "output/data/posteriors_country.csv",
     output:
-        "output/plots/country_utilities.png",
+        "output/plots/supp_figs/country_direct.png",
     shell:
         "Rscript scripts/visualisation/plot_country.R"
+
+
+rule plot_country_total:
+    input:
+        "output/data/posteriors_country_total.csv",
+    output:
+        "output/plots/country_total.png",
+    shell:
+        "Rscript scripts/visualisation/plot_country_total.R"
 
 
 rule plot_theta_forest:
@@ -109,7 +170,7 @@ rule plot_theta_heatmap:
     input:
         "output/data/posteriors_theta.csv",
     output:
-        "output/plots/theta_heatmap.png",
+        "output/plots/supp_figs/theta_heatmap.png",
     shell:
         "Rscript scripts/visualisation/plot_theta_heatmap.R"
 
@@ -123,6 +184,15 @@ rule plot_value_distributions:
         "Rscript scripts/visualisation/plot_value_distributions.R"
 
 
+rule plot_loadings:
+    input:
+        "output/data/posteriors_loadings.csv",
+    output:
+        "output/plots/supp_figs/factor_loadings.png",
+    shell:
+        "Rscript scripts/visualisation/plot_factor_loadings.R"
+
+
 rule sample_description:
     input:
         ch="data/data_translated_ch.csv",
@@ -131,3 +201,15 @@ rule sample_description:
         "output/tables/sample_description.tex",
     shell:
         "python scripts/tables/sample_description.py"
+
+
+rule value_correlations:
+    input:
+        ch="data/data_translated_ch.csv",
+        cn="data/data_translated_cn.csv",
+        values="data/data_values_ch_cn.csv",
+    output:
+        ch="output/tables/value_correlations_ch.csv",
+        cn="output/tables/value_correlations_cn.csv",
+    script:
+        "scripts/analysis/value_correlations.py"

@@ -112,8 +112,8 @@ def reshape_conjoint_to_long(df, respondent_id_col = None, country = "CH"):
     if "attr_source" in long_df.columns or "attr_purpose" in long_df.columns:
         long_df["attr_source_purpose"] = long_df["attr_source"].combine_first(long_df["attr_purpose"])
         long_df["framing"] = None
-        long_df.loc[long_df["attr_source"].notna(), "framing"] = "source"
-        long_df.loc[long_df["attr_purpose"].notna(), "framing"] = "purpose"
+        long_df.loc[long_df["attr_source"].notna(), "framing"] = "purpose"
+        long_df.loc[long_df["attr_purpose"].notna(), "framing"] = "source"
 
         long_df = long_df.drop(columns=["attr_source", "attr_purpose"])
 

@@ -9,7 +9,11 @@ coding    <- config$coding
 plt       <- config$plots
 ci_width  <- plt$ci_width
 base_size <- plt$base_size
+fig_width <- plt$fig_width
 dpi_val   <- plt$dpi
+div_low   <- plt$diverging_colours$low
+div_mid   <- plt$diverging_colours$mid
+div_high  <- plt$diverging_colours$high
 
 baseline_level_names <- c(
   "attr_engagement_inform",
@@ -151,9 +155,9 @@ ggplot(theta_summary, aes(x = dim_label, y = level_base)) +
     fontface = "bold"
   ) +
   scale_fill_gradient2(
-    low      = "#b07aa1",
-    mid      = "white",
-    high     = "#59a14f",
+    low      = div_low,
+    mid      = div_mid,
+    high     = div_high,
     midpoint = 0,
     name     = "θ (posterior mean)"
   ) +
@@ -167,13 +171,13 @@ ggplot(theta_summary, aes(x = dim_label, y = level_base)) +
   theme_classic(base_size = base_size) +
   theme(
     axis.text.y     = element_markdown(lineheight = 1.2),
-    axis.text.x     = element_text(face = "bold", size = 13),
+    axis.text.x     = element_text(face = "bold", size = base_size - 1),
     axis.ticks.x    = element_blank(),
     legend.position = "right",
     plot.margin     = margin(10, 20, 10, 10)
   )
 
 ggsave(
-  "output/plots/theta_heatmap.png",
-  width = 9, height = 10, dpi = dpi_val, bg = "white"
+  "output/plots/supp_figs/theta_heatmap.png",
+  width = fig_width, height = 10, dpi = dpi_val, bg = "white"
 )

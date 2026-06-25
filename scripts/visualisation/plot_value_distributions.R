@@ -3,10 +3,13 @@ library(yaml)
 
 # ---- settings ----
 
-config    <- read_yaml("config.yaml")
-plt       <- config$plots
-base_size <- plt$base_size
-dpi_val   <- plt$dpi
+config       <- read_yaml("config.yaml")
+plt          <- config$plots
+base_size    <- plt$base_size
+fig_width_w  <- plt$fig_width_wide
+dpi_val      <- plt$dpi
+slab_alpha   <- plt$slab_alpha_framing
+value_colours <- unlist(plt$value_colours)
 
 # ---- load data ----
 
@@ -29,9 +32,9 @@ country_labels <- c(
 )
 
 dim_colours <- c(
-  "Left-right economic" = "#4e79a7",
-  "GAL-TAN"             = "#f28e2b",
-  "Socio-ecological"    = "#59a14f"
+  "Left-right economic" = value_colours[["lreco"]],
+  "GAL-TAN"              = value_colours[["galtan"]],
+  "Socio-ecological"     = value_colours[["socio_ecol"]]
 )
 
 values_long <- values |>
@@ -48,7 +51,7 @@ values_long <- values |>
 # ---- plot ----
 
 ggplot(values_long, aes(x = score, fill = dim_label, colour = dim_label)) +
-  geom_density(alpha = 0.35, linewidth = 0.8) +
+  geom_density(alpha = slab_alpha, linewidth = 0.5) +
   geom_vline(xintercept = 1.5, linetype = "dashed", colour = "grey40", linewidth = 0.4) +
   facet_wrap(~ country_label, ncol = 2) +
   scale_fill_manual(values = dim_colours, name = NULL) +
@@ -64,5 +67,5 @@ ggplot(values_long, aes(x = score, fill = dim_label, colour = dim_label)) +
 
 ggsave(
   "output/plots/value_distributions.png",
-  width = 10, height = 5, dpi = dpi_val, bg = "white"
+  width = fig_width_w, height = 5, dpi = dpi_val, bg = "white"
 )

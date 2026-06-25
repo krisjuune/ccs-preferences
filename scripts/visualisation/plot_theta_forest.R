@@ -9,11 +9,12 @@ config       <- read_yaml("config.yaml")
 coding       <- config$coding
 plt          <- config$plots
 attr_colours <- unlist(plt$attr_colours)
-slab_alpha   <- plt$slab_alpha
+slab_alpha   <- plt$slab_alpha_framing
 point_size   <- plt$point_size
 point_alpha  <- plt$point_alpha
 ci_width     <- plt$ci_width
 base_size    <- plt$base_size
+fig_width_w  <- plt$fig_width_wide
 dpi_val      <- plt$dpi
 
 baseline_level_names <- c(
@@ -181,7 +182,7 @@ ggplot(plot_data, aes(x = value, y = level_base, fill = attribute, colour = attr
     na.value = NA,
     guide    = guide_legend(
       nrow         = 1,
-      override.aes = list(alpha = 0.7, colour = NA, size = 5),
+      override.aes = list(alpha = 0.7, slab_alpha = 0.7, colour = NA, size = 5),
       order = 1
     )
   ) +
@@ -192,7 +193,7 @@ ggplot(plot_data, aes(x = value, y = level_base, fill = attribute, colour = attr
   theme(
     axis.text.y          = element_markdown(lineheight = 1.2),
     panel.grid.major.x   = element_line(color = "grey92", linewidth = 0.4),
-    strip.text           = element_text(face = "bold", size = 14),
+    strip.text           = element_text(face = "bold", size = base_size),
     strip.background     = element_blank(),
     plot.margin          = margin(10, 20, 10, 10),
     legend.position      = "bottom",
@@ -201,5 +202,5 @@ ggplot(plot_data, aes(x = value, y = level_base, fill = attribute, colour = attr
 
 ggsave(
   "output/plots/theta_forest.png",
-  width = 20, height = 10, dpi = dpi_val, bg = "white"
+  width = fig_width_w, height = 10, dpi = dpi_val, bg = "white"
 )

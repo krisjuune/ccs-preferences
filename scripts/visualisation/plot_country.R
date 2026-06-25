@@ -15,6 +15,7 @@ point_size   <- plt$point_size
 point_alpha  <- plt$point_alpha
 ci_width     <- plt$ci_width
 base_size    <- plt$base_size
+fig_width_w  <- plt$fig_width_wide
 dpi_val      <- plt$dpi
 sp_light     <- plt$sp_source_light
 
@@ -157,14 +158,14 @@ plot_data <- bind_rows(plot_data, header_rows) |>
 # legend setup — identical to plot_partworths.R
 row1_breaks <- c("attr_vicinity", "sp_source", "sp_purpose")
 row1_values <- c(
-  "attr_vicinity" = "#f28e2b",
-  "sp_source"     = "#b07aa1",
-  "sp_purpose"    = "#b07aa1"
+  "attr_vicinity" = attr_colours[["attr_vicinity"]],
+  "sp_source"     = attr_colours[["attr_source_purpose"]],
+  "sp_purpose"    = "#b07aa1"   # hardcoded: must match sp_source exactly for legend override.aes to render correctly
 )
 row1_labels <- c(
   "attr_vicinity" = "Proximity",
-  "sp_source"     = "Source / Purpose (source framing)",
-  "sp_purpose"    = "Source / Purpose (purpose framing)"
+  "sp_source"     = "Source / Purpose (purpose framing)",
+  "sp_purpose"    = "Source / Purpose (source framing)"
 )
 row2_breaks <- c("attr_industry", "attr_costs", "attr_reason", "attr_engagement")
 row2_values <- attr_colours[row2_breaks]
@@ -258,12 +259,12 @@ ggplot(
   ) +
   scale_colour_manual(values = c(row1_values, row2_values), na.value = NA, guide = "none") +
   facet_wrap(~ country_label, ncol = 2) +
-  labs(x = "Utility (β + γ)", y = NULL) +
+  labs(x = "Direct utility (β + γ)", y = NULL) +
   theme_classic(base_size = base_size) +
   theme(
     axis.text.y          = element_markdown(lineheight = 1.2),
     panel.grid.major.x   = element_line(color = "grey92", linewidth = 0.4),
-    strip.text           = element_text(face = "bold", size = 14),
+    strip.text           = element_text(face = "bold", size = base_size),
     strip.background     = element_blank(),
     plot.margin          = margin(10, 20, 10, 10),
     legend.position      = "bottom",
@@ -271,6 +272,6 @@ ggplot(
   )
 
 ggsave(
-  "output/plots/country_utilities.png",
-  width = 14, height = 10, dpi = dpi_val, bg = "white"
+  "output/plots/supp_figs/country_direct.png",
+  width = fig_width_w, height = 10, dpi = dpi_val, bg = "white"
 )

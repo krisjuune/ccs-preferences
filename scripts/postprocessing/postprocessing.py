@@ -7,16 +7,22 @@ try:
     run_basic = snakemake.config.get("run_basic_model", True)
     bcm_path  = snakemake.input.bcm if run_basic else None
     hcm_path  = snakemake.input.hcm
+    hcm_input_path = snakemake.input.hcm_input
     out_beta    = snakemake.output.beta
     out_country = snakemake.output.country
+    out_country_total = snakemake.output.country_total
     out_theta   = snakemake.output.theta
+    out_loadings = snakemake.output.loadings
 except NameError:
     run_basic = True
     bcm_path  = "output/data/inference_basic_choice.nc"
     hcm_path  = "output/data/inference_hybrid_choice.nc"
+    hcm_input_path = "data/hcm_input.csv"
     out_beta    = "output/data/posteriors_beta.csv"
     out_country = "output/data/posteriors_country.csv"
+    out_country_total = "output/data/posteriors_country_total.csv"
     out_theta   = "output/data/posteriors_theta.csv"
+    out_loadings = "output/data/posteriors_loadings.csv"
 
 
 def extract_beta(posterior, model_name):
@@ -204,6 +210,122 @@ def extract_theta(posterior, model_name):
     return result[["model", "dim", "level", "chain", "draw", "value"]]
 
 
+def extract_indirect(posterior, df, model_name):
+    """
+    Indirect country effect mediated by the latent value dimensions: the
+    portion of a country's average utility for a level that arises because
+    that country has a systematically different distribution of latent
+    values (lreco/galtan/ecol), as opposed to the direct/residual country
+    effect already captured by gamma.
+
+    indirect[country, level] = sum_dim theta_dim[level] *
+        (mean of dim's latent trait within country - global mean across
+         all individuals)
+
+    Levels with no theta term (attribute baselines, dropped under
+    reference_level coding) get indirect = 0, consistent with their direct
+    effect also being 0 by construction.
+
+    Columns: model, country, level, chain, draw, value
+    """
+    dim_latent = {
+        "lreco": "lreco_latent",
+        "galtan": "galtan_latent",
+        "ecol": "socio_ecol_latent",
+    }
+    id_to_country = df.drop_duplicates("id").set_index("id")["country"]
+    countries = sorted(id_to_country.unique())
+
+    totals = {country: 0 for country in countries}
+    level_coord = None
+
+    for dim, latent_param in dim_latent.items():
+        theta_param = f"theta_{dim}"
+        if latent_param not in posterior or theta_param not in posterior:
+            continue
+        latent = posterior[latent_param]  # (chain, draw, individual)
+        theta  = posterior[theta_param]   # (chain, draw, level)
+        level_coord = theta.level
+
+        global_mean = latent.mean(dim="individual")  # (chain, draw)
+
+        for country in countries:
+            ids_in_country = id_to_country[id_to_country == country].index.values
+            country_mean = latent.sel(individual=ids_in_country).mean(dim="individual")
+            centered = country_mean - global_mean       # (chain, draw)
+            totals[country] = totals[country] + theta * centered  # (chain, draw, level)
+
+    rows = []
+    for country, contribution in totals.items():
+        if level_coord is None:
+            continue
+        df_c = (
+            contribution.to_dataframe(name="value")
+            .reset_index()[["chain", "draw", "level", "value"]]
+        )
+        df_c["model"] = model_name
+        df_c["country"] = country
+        rows.append(df_c)
+
+    result = pd.concat(rows, ignore_index=True)
+    return result[["model", "country", "level", "chain", "draw", "value"]]
+
+
+def combine_total(direct_df, indirect_df):
+    """
+    Total country effect = direct (beta + gamma, with framing adjustment for
+    attr_source_purpose) + indirect (mediated by latent values). Indirect is
+    matched on the level with any framing suffix stripped, since theta does
+    not depend on framing.
+
+    Columns: model, country, level, framing, chain, draw, value
+    """
+    indirect_df = indirect_df.rename(columns={"level": "base_level", "value": "indirect"})
+    direct_df = direct_df.copy()
+    direct_df["base_level"] = direct_df["level"].str.replace(r"_(source|purpose)$", "", regex=True)
+
+    merged = direct_df.merge(
+        indirect_df[["model", "country", "base_level", "chain", "draw", "indirect"]],
+        on=["model", "country", "base_level", "chain", "draw"],
+        how="left",
+    )
+    merged["indirect"] = merged["indirect"].fillna(0.0)
+    merged["value"] = merged["value"] + merged["indirect"]
+    return merged[["model", "country", "level", "framing", "chain", "draw", "value"]]
+
+
+def extract_loadings(posterior, model_name):
+    """
+    Factor loadings from the measurement model (SEM part of the HCM).
+
+    Item 1 per latent dimension is fixed to 1 for scale identification (not
+    estimated); items 2 and 3 are free loadings (lambda_lreco, lambda_galtan,
+    lambda_ecol).
+
+    Columns: model, dim, item, chain, draw, value
+    """
+    rows = []
+    dim_params = {"lreco": "lambda_lreco", "galtan": "lambda_galtan", "ecol": "lambda_ecol"}
+    for dim, param in dim_params.items():
+        if param not in posterior:
+            continue
+        lam = posterior[param]  # (chain, draw, 2) — items 2 and 3
+        item_dim = lam.dims[-1]
+        for i, item in enumerate(["item_2", "item_3"]):
+            df = (
+                lam.isel({item_dim: i})
+                .to_dataframe(name="value")
+                .reset_index()[["chain", "draw", "value"]]
+            )
+            df["model"] = model_name
+            df["dim"] = dim
+            df["item"] = item
+            rows.append(df)
+
+    result = pd.concat(rows, ignore_index=True)
+    return result[["model", "dim", "item", "chain", "draw", "value"]]
+
+
 # load inference data
 hcm = az.from_netcdf(hcm_path)
 
@@ -221,11 +343,20 @@ else:
     beta_all    = extract_beta(hcm.posterior, "hybrid")
     country_all = extract_country(hcm.posterior, "hybrid")
 
-# theta only exists in the hybrid model
-theta_all = extract_theta(hcm.posterior, "hybrid")
+# theta and factor loadings only exist in the hybrid model
+theta_all    = extract_theta(hcm.posterior, "hybrid")
+loadings_all = extract_loadings(hcm.posterior, "hybrid")
+
+# total country effect = direct (beta + gamma) + indirect (mediated by values)
+hcm_input_df       = pd.read_csv(hcm_input_path)
+indirect_all       = extract_indirect(hcm.posterior, hcm_input_df, "hybrid")
+country_direct_hcm = country_all[country_all["model"] == "hybrid"]
+country_total_all  = combine_total(country_direct_hcm, indirect_all)
 
 # save
 os.makedirs(os.path.dirname(out_beta), exist_ok=True)
 beta_all.to_csv(out_beta, index=False)
 country_all.to_csv(out_country, index=False)
+country_total_all.to_csv(out_country_total, index=False)
 theta_all.to_csv(out_theta, index=False)
+loadings_all.to_csv(out_loadings, index=False)

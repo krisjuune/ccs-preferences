@@ -15,11 +15,10 @@ point_size   <- plt$point_size
 point_alpha  <- plt$point_alpha
 ci_width     <- plt$ci_width
 base_size    <- plt$base_size
-fig_width    <- plt$fig_width
+fig_width_w  <- plt$fig_width_wide
 dpi_val      <- plt$dpi
 sp_light     <- plt$sp_source_light
 
-# baseline level names (one per attribute, fixed to 0 under reference_level coding)
 baseline_level_names <- c(
   "attr_engagement_inform",
   "attr_vicinity_abroad",
@@ -31,7 +30,7 @@ baseline_level_names <- c(
 
 # ---- load data ----
 
-beta <- read_csv("output/data/posteriors_beta.csv")
+country_data <- read_csv("output/data/posteriors_country_total.csv")
 
 # ---- attribute ordering and display ----
 
@@ -105,36 +104,44 @@ build_y_structure <- function() {
 
 y_struct <- build_y_structure()
 
+# ---- country labels for facets ----
+
+country_labels <- c(
+  "china"       = "China",
+  "switzerland" = "Switzerland"
+)
+
 # ---- prepare data ----
 
-plot_data <- beta |>
+plot_data <- country_data |>
   filter(model == "hybrid") |>
   filter(
-    # non-source_purpose: use average (framing-pooled)
     (framing == "average" & !grepl("source_purpose", level)) |
-    # source_purpose: use framing-specific rows
     (framing %in% c("source", "purpose") & grepl("source_purpose", level))
   ) |>
   mutate(
-    # strip framing suffix so source and purpose share a y-position
-    level_base = gsub("_(source|purpose)$", "", level),
-    attribute  = sapply(level_base, get_attribute)
+    level_base    = gsub("_(source|purpose)$", "", level),
+    attribute     = sapply(level_base, get_attribute),
+    country_label = country_labels[country]
   ) |>
   filter(level_base %in% names(level_display)) |>
   mutate(level_base = factor(level_base, levels = y_struct$levels))
 
-# empty header rows (no distribution plotted, just y-axis label)
-header_rows <- tibble(
-  level_base = factor(
-    grep("^header_", y_struct$levels, value = TRUE),
-    levels = y_struct$levels
+header_rows <- crossing(
+  tibble(
+    level_base = factor(
+      grep("^header_", y_struct$levels, value = TRUE),
+      levels = y_struct$levels
+    ),
+    value     = NA_real_,
+    model     = "hybrid",
+    framing   = "average",
+    attribute = NA_character_,
+    chain     = 1L,
+    draw      = 1L
   ),
-  value     = NA_real_,
-  model     = "hybrid",
-  framing   = "average",
-  attribute = NA_character_,
-  chain     = 1L,
-  draw      = 1L
+  country       = names(country_labels),
+  country_label = unname(country_labels)
 )
 
 plot_data <- bind_rows(plot_data, header_rows) |>
@@ -148,7 +155,7 @@ plot_data <- bind_rows(plot_data, header_rows) |>
     )
   )
 
-# Row 1 legend (fill): vicinity + two purples — independent column widths
+# legend setup — identical to plot_partworths.R
 row1_breaks <- c("attr_vicinity", "sp_source", "sp_purpose")
 row1_values <- c(
   "attr_vicinity" = attr_colours[["attr_vicinity"]],
@@ -160,8 +167,6 @@ row1_labels <- c(
   "sp_source"     = "Source / Purpose (purpose framing)",
   "sp_purpose"    = "Source / Purpose (source framing)"
 )
-
-# Row 2 legend (colour): remaining four attributes
 row2_breaks <- c("attr_industry", "attr_costs", "attr_reason", "attr_engagement")
 row2_values <- attr_colours[row2_breaks]
 row2_labels <- c(
@@ -171,19 +176,25 @@ row2_labels <- c(
   "attr_engagement" = "Engagement"
 )
 
-# baseline rows (reference_level only): implicit value = 0, shown as a dot
+# ---- plot ----
+
+# baseline rows (reference_level only): shown as a dot at x=0 per country
 baseline_df <- if (coding == "reference_level") {
-  tibble(
-    level_base = factor(baseline_level_names, levels = y_struct$levels),
-    fill_group = if_else(
-      grepl("source_purpose", baseline_level_names),
-      "sp_source",
-      sapply(baseline_level_names, get_attribute)
+  crossing(
+    tibble(
+      level_base = factor(baseline_level_names, levels = y_struct$levels),
+      fill_group = if_else(
+        grepl("source_purpose", baseline_level_names),
+        "sp_source",
+        sapply(baseline_level_names, get_attribute)
+      )
+    ),
+    tibble(
+      country       = names(country_labels),
+      country_label = unname(country_labels)
     )
   )
 } else NULL
-
-# ---- plot ----
 
 ggplot(
   plot_data,
@@ -230,52 +241,37 @@ ggplot(
     limits = rev(y_struct$levels),
     drop   = FALSE
   ) +
-  # row 1: vicinity + two purple framing entries (sized by their own labels)
   scale_fill_manual(
     name     = NULL,
     values   = c(row1_values, row2_values),
-    breaks   = row1_breaks,
-    labels   = row1_labels,
+    breaks   = c(row1_breaks, row2_breaks),
+    labels   = c(row1_labels, row2_labels),
     na.value = NA,
     guide    = guide_legend(
       nrow         = 1,
       override.aes = list(
-        fill   = c(attr_colours["attr_vicinity"], sp_light, attr_colours["attr_source_purpose"]),
-        alpha  = c(0.7, 1.0, 0.7),
+        fill   = c(attr_colours["attr_vicinity"], sp_light, attr_colours["attr_source_purpose"], unname(row2_values)),
+        alpha  = c(0.7, 1.0, 0.7, rep(0.7, 4)),
         colour = NA,
         size   = 5
-      ),
-      order = 1
+      )
     )
   ) +
-  # row 2: remaining four attributes (sized by their own shorter labels)
-  scale_colour_manual(
-    name     = NULL,
-    values   = c(row1_values, row2_values),
-    breaks   = row2_breaks,
-    labels   = row2_labels,
-    na.value = NA,
-    guide    = guide_legend(
-      nrow         = 1,
-      override.aes = list(
-        fill   = unname(row2_values),
-        colour = NA,
-        alpha  = rep(0.7, 4),
-        size   = 5
-      ),
-      order = 2
-    )
-  ) +
-  labs(x = "Partworth utility", y = NULL) +
+  scale_colour_manual(values = c(row1_values, row2_values), na.value = NA, guide = "none") +
+  facet_wrap(~ country_label, ncol = 2) +
+  labs(x = "Total utility (direct + indirect via values)", y = NULL) +
   theme_classic(base_size = base_size) +
   theme(
     axis.text.y          = element_markdown(lineheight = 1.2),
     panel.grid.major.x   = element_line(color = "grey92", linewidth = 0.4),
+    strip.text           = element_text(face = "bold", size = base_size),
+    strip.background     = element_blank(),
     plot.margin          = margin(10, 20, 10, 10),
     legend.position      = "bottom",
-    legend.justification = "center",
-    legend.box           = "vertical",
-    legend.box.just      = "left"
+    legend.justification = "center"
   )
 
-ggsave("output/plots/supp_figs/partworths.png", width = fig_width, height = 10, dpi = dpi_val, bg = "white")
+ggsave(
+  "output/plots/country_total.png",
+  width = fig_width_w, height = 10, dpi = dpi_val, bg = "white"
+)
