@@ -1,4 +1,4 @@
-# CCS siting preferences — CH/CN discrete choice experiment
+# CCS siting preferences — choice experiment in Switzerland and China
 
 Snakemake pipeline for a discrete choice experiment on public preferences
 for carbon capture and storage (CCS) site characteristics in Switzerland and
