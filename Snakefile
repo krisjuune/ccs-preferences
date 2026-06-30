@@ -4,7 +4,6 @@ configfile: "config.yaml"
 rule all:
     input:
         "output/plots/supp_figs/partworths.png",
-        "output/plots/supp_figs/country_direct.png",
         "output/plots/country_total.png",
         "output/plots/theta_forest.png",
         "output/plots/supp_figs/theta_heatmap.png",
@@ -145,15 +144,6 @@ rule plot_partworths:
         "output/plots/supp_figs/partworths.png",
     shell:
         "Rscript scripts/visualisation/plot_partworths.R"
-
-
-rule plot_country_direct:
-    input:
-        "output/data/posteriors_country.csv",
-    output:
-        "output/plots/supp_figs/country_direct.png",
-    shell:
-        "Rscript scripts/visualisation/plot_country.R"
 
 
 rule plot_country_total:
