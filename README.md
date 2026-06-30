@@ -51,14 +51,15 @@ snakemake --cores 4 -R plot_partworths
 2. **Choice models** (`scripts/analysis/`) — fit in PyMC:
    - `basic_choice_model.py` — simple multinomial choice model (no latent
      traits), off by default (`run_basic_model: false`)
-   - `hybrid_choice_model.py` — the main model: measurement model (CFA-style
-     factor loadings) for the latent value dimensions, plus a choice model
-     where preferences are moderated by those latent traits
-   - `interaction_choice_model.py` — adds cherry-picked attribute
-     interactions, incl. a three-way country × proximity × framing term
-     (enabled via `run_interaction_model: true`)
+   - `main_hybrid_choice_model.py` — the model behind all main results: HCM
+     (measurement model + value-moderated choice model) plus the proximity ×
+     Source/Purpose × country three-way interaction. Always runs.
+   - `base_hybrid_choice_model.py` — the same HCM without the interaction
+     term. Optional, off by default (`run_base_model: false`), kept only for
+     comparison against the main model.
    - `full_interaction_choice_model.py` — all pairwise attribute-level
-     interactions (enabled via `run_full_interaction_model: true`)
+     interactions, no three-way term. Optional, off by default
+     (`run_full_interaction_model: false`).
 3. **Postprocessing** (`scripts/postprocessing/`) — extract posterior
    samples into tidy CSVs for plotting (partworths, country-specific
    utilities, value moderation effects, factor loadings, interaction
@@ -72,11 +73,14 @@ snakemake --cores 4 -R plot_partworths
 ## Configuration (`config.yaml`)
 
 - `raw_data` — paths to the raw CH/CN survey export files.
-- `run_basic_model` / `run_interaction_model` / `run_full_interaction_model`
-  — toggle optional model variants on/off.
+- `run_basic_model` / `run_base_model` / `run_full_interaction_model`
+  — toggle optional model variants on/off (all default `false`).
+  `main_hybrid_choice_model` is not behind a flag — it always runs.
 - `coding` — `"sum_to_zero"` or `"reference_level"`, controls how attribute
-  levels are dummy-coded across all choice models (see
-  `hybrid_choice_model.py` for the baseline level chosen per attribute).
+  levels are dummy-coded for `base_hybrid_choice_model.py` and
+  `basic_choice_model.py` (see either for the baseline level chosen per
+  attribute). `main_hybrid_choice_model.py` always uses reference-level
+  coding, since the interaction terms need an unambiguous baseline.
 - `mcmc` — sampler settings (`seed`, `draws`, `tune`, `chains`, `cores`),
   shared by all choice models.
 - `plots` — shared visual settings (sizes, colours, alphas) read by every

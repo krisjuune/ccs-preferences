@@ -1,3 +1,11 @@
+"""
+Base hybrid choice model: the HCM (measurement model + value-moderated
+choice model) without any attribute interactions. Optional, off by default
+(run_base_model in config.yaml) — kept for comparison against
+main_hybrid_choice_model.py, which is what the repo's main plots use.
+
+Supports both coding schemes via the global `coding` config setting.
+"""
 import os
 import pymc as pm
 import pandas as pd
@@ -18,7 +26,7 @@ except NameError:
     _seed = 42
     _draws, _tune, _chains, _cores = 250, 250, 4, 4
     _coding = "sum_to_zero"
-    _output = "output/data/inference_hybrid_choice.nc"
+    _output = "output/data/inference_base_hybrid_choice.nc"
 
 _model_name = os.path.splitext(os.path.basename(_output))[0]
 _out_data = os.path.join("output", "data", _model_name)

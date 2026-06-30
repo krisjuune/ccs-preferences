@@ -1,12 +1,12 @@
 """
-Postprocessing for the interaction choice model output.
+Postprocessing for the main hybrid choice model's proximity x Source/Purpose
+x country three-way interaction.
 
 Extracts:
   1. posteriors_interact_coefs.csv — raw posterior samples of beta_interact
      and (per-country) gamma_interact
-  2. posteriors_interact_conditional.csv — conditional marginal effects:
-     for each interaction pair, the marginal utility of attribute B's
-     non-baseline level given each level of attribute A
+  2. posteriors_interact_conditional.csv — proximity utility under domestic
+     vs. foreign CO2, pooled and per country (see plot_interact_conditional.R)
 """
 import os
 import arviz as az
@@ -18,7 +18,7 @@ try:
     out_coefs    = snakemake.output.coefs
     out_cond     = snakemake.output.conditional
 except NameError:
-    idata_path   = "output/data/inference_interaction_choice.nc"
+    idata_path   = "output/data/inference_main_hybrid_choice.nc"
     out_coefs    = "output/data/posteriors_interact_coefs.csv"
     out_cond     = "output/data/posteriors_interact_conditional.csv"
 
@@ -31,7 +31,7 @@ posterior = idata.posterior
 
 beta          = posterior["beta"]           # (chain, draw, level)
 gamma         = posterior["gamma"]          # (chain, draw, country, level)
-beta_interact = posterior["beta_interact"]  # (chain, draw, interact)
+beta_interact = posterior["beta_interact"]  # (chain, draw, prox_source_interact)
 gamma_interact = posterior["gamma_interact"] # (chain, draw, country, prox_source_interact)
 delta         = posterior["delta"]          # (chain, draw)
 
@@ -45,7 +45,8 @@ draw_idx  = np.tile(beta.draw.values, n_chains)
 beta_rows = (
     beta_interact
     .to_dataframe(name="value")
-    .reset_index()[["chain", "draw", "interact", "value"]]
+    .reset_index()[["chain", "draw", "prox_source_interact", "value"]]
+    .rename(columns={"prox_source_interact": "interact"})
     .assign(country="pooled", param="beta_interact")
 )
 
@@ -60,11 +61,8 @@ gamma_rows = (
 coefs_df = pd.concat([beta_rows, gamma_rows], ignore_index=True)
 
 # ---- 2. conditional marginal effects ----
-# For each interaction term A×B: marginal effect of B's non-baseline level
-# given A is at each of its levels (including the A baseline = no interaction)
 
-interact_names = [str(l) for l in beta_interact.interact.values]
-prox_source_names = [str(l) for l in gamma_interact.prox_source_interact.values]
+interact_names = [str(l) for l in beta_interact.prox_source_interact.values]
 
 rows = []
 
@@ -118,7 +116,7 @@ if source_levels and prox_levels:
                 n for n in interact_names
                 if n.startswith(prox_l) and "source_purpose" in n
             )
-            beta_int = beta_interact.sel(interact=interact_name)
+            beta_int = beta_interact.sel(prox_source_interact=interact_name)
 
         for country_name in ["pooled"] + [str(c) for c in gamma.country.values]:
             pooled = country_name == "pooled"
@@ -155,49 +153,6 @@ if source_levels and prox_levels:
                 ).values.ravel()
             add_row(rows, chain_idx, draw_idx, "prox_source", prox_l,
                     country_name, for_vals, framing="foreign")
-
-# ---- Costs × Industry conditional effects ----
-# ME(polluting_industry | industry = X) = β[polluting] + β_interact[polluting × X]
-
-cost_levels     = nonbaseline_level("attr_costs", beta.level.values)
-industry_levels = nonbaseline_level("attr_industry", beta.level.values)
-
-if cost_levels and industry_levels:
-    cost_l = str(cost_levels[0])  # "attr_costs_polluting industry"
-    beta_cost = beta.sel(level=cost_l)
-
-    # baseline industry (waste incineration): no interaction term
-    add_row(rows, chain_idx, draw_idx,
-            "costs_industry", "attr_industry_waste incineration",
-            "pooled", beta_cost.values.ravel())
-
-    for interact_name in [n for n in interact_names if "attr_costs" in n and "attr_industry" in n]:
-        industry_l = interact_name.split("::")[1]
-        beta_int = beta_interact.sel(interact=interact_name)
-        vals = (beta_cost + beta_int).values.ravel()
-        add_row(rows, chain_idx, draw_idx,
-                "costs_industry", industry_l, "pooled", vals)
-
-# ---- Proximity × Close-to-source conditional effects ----
-# ME(close_to_source | prox = L) = β[close_to_source] + β_interact[L × close_to_source]
-
-reason_levels = nonbaseline_level("attr_reason_close to source", beta.level.values)
-if reason_levels:
-    reason_l = str(reason_levels[0])
-    beta_close = beta.sel(level=reason_l)
-
-    # baseline proximity
-    add_row(rows, chain_idx, draw_idx,
-            "prox_close", "attr_vicinity_abroad",
-            "pooled", beta_close.values.ravel())
-
-    for interact_name in [n for n in interact_names
-                          if "attr_vicinity" in n and "close to source" in n]:
-        prox_l = interact_name.split("::")[0]
-        beta_int = beta_interact.sel(interact=interact_name)
-        vals = (beta_close + beta_int).values.ravel()
-        add_row(rows, chain_idx, draw_idx,
-                "prox_close", prox_l, "pooled", vals)
 
 cond_df = pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
 

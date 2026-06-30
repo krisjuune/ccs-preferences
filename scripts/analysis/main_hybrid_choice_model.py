@@ -1,16 +1,18 @@
 """
-Hybrid choice model with cherry-picked interaction effects.
-
-Interactions included:
-  1. Proximity × Source/Purpose (+ country-moderated three-way via gamma_interact)
-  2. Proximity × Location reason (close to source only)
-  3. Costs × Industry
+Main hybrid choice model: the HCM (measurement model + value-moderated
+choice model) plus the proximity x Source/Purpose x country three-way
+interaction. This is the model used for all of the repo's main results and
+plots (partworths, country direct/total effects, theta, factor loadings),
+since omitting a real interaction can bias the main-effect estimates.
 
 Always uses reference level coding regardless of the global `coding` config
-setting, because reference level gives clean, unambiguous interaction estimates.
+setting, because reference level gives clean, unambiguous interaction
+estimates.
+
+See base_hybrid_choice_model.py for the same model without the interaction
+term (optional, for comparison; toggle via run_base_model in config.yaml).
 """
 import os
-from itertools import product as iterprod
 
 import arviz as az
 import matplotlib.pyplot as plt
@@ -35,7 +37,7 @@ try:
 except NameError:
     _seed = 42
     _draws, _tune, _chains, _cores = 250, 250, 4, 4
-    _output = "output/data/inference_interaction_choice.nc"
+    _output = "output/data/inference_main_hybrid_choice.nc"
 
 _model_name = os.path.splitext(os.path.basename(_output))[0]
 _out_data = os.path.join("output", "data", _model_name)
@@ -60,7 +62,7 @@ baseline_dict = {
     "attr_source_purpose": "domestic",
 }
 
-# reference level coding (always for interaction models)
+# reference level coding (always for the main model)
 for attr in attributes:
     baseline = baseline_dict[attr]
     df[attr] = pd.Categorical(
@@ -80,39 +82,19 @@ sp_mask = np.array(
     [1.0 if c.startswith("attr_source_purpose") else 0.0 for c in dummies.columns]
 )
 
-# ---- cherry-picked interaction dummies ----
+# ---- proximity x source/purpose interaction dummies (basis for the three-way) ----
 
-prox_cols     = [c for c in dummies.columns if c.startswith("attr_vicinity")]
-source_cols   = [c for c in dummies.columns if c.startswith("attr_source_purpose")]
-cost_cols     = [c for c in dummies.columns if c.startswith("attr_costs")]
-industry_cols = [c for c in dummies.columns if c.startswith("attr_industry")]
-reason_close  = "attr_reason_close to source"
+prox_cols   = [c for c in dummies.columns if c.startswith("attr_vicinity")]
+source_cols = [c for c in dummies.columns if c.startswith("attr_source_purpose")]
 
-interact_parts = {}
-
-# 1. Proximity × Source/Purpose (basis for three-way with country)
 prox_source_cols = []
-for pc, sc in iterprod(prox_cols, source_cols):
-    name = f"{pc}::{sc}"
-    interact_parts[name] = dummies[pc] * dummies[sc]
-    prox_source_cols.append(name)
+interact_parts = {}
+for pc in prox_cols:
+    for sc in source_cols:
+        name = f"{pc}::{sc}"
+        interact_parts[name] = dummies[pc] * dummies[sc]
+        prox_source_cols.append(name)
 
-# 2. Proximity × Location reason (close to source only)
-prox_close_cols = []
-if reason_close in dummies.columns:
-    for pc in prox_cols:
-        name = f"{pc}::{reason_close}"
-        interact_parts[name] = dummies[pc] * dummies[reason_close]
-        prox_close_cols.append(name)
-
-# 3. Costs × Industry
-costs_industry_cols = []
-for cc, ic in iterprod(cost_cols, industry_cols):
-    name = f"{cc}::{ic}"
-    interact_parts[name] = dummies[cc] * dummies[ic]
-    costs_industry_cols.append(name)
-
-all_interact_cols = prox_source_cols + prox_close_cols + costs_industry_cols
 interact_df = pd.DataFrame(interact_parts)
 
 # ---- HCM setup ----
@@ -135,7 +117,6 @@ coords = {
     "task":                np.arange(df_left.shape[0]),
     "country":             df["country"].cat.categories,
     "individual":          unique_individuals,
-    "interact":            all_interact_cols,
     "prox_source_interact": prox_source_cols,
 }
 
@@ -143,7 +124,7 @@ coords = {
 
 with pm.Model(coords=coords) as model:
 
-    # -- measurement model (same as HCM) --
+    # -- measurement model (same as base HCM) --
     lreco_latent      = pm.Normal("lreco_latent",      mu=0, sigma=1, dims="individual")
     galtan_latent     = pm.Normal("galtan_latent",     mu=0, sigma=1, dims="individual")
     socio_ecol_latent = pm.Normal("socio_ecol_latent", mu=0, sigma=1, dims="individual")
@@ -172,12 +153,10 @@ with pm.Model(coords=coords) as model:
     attribute_levels_left  = pm.Data("attribute_levels_left",  dummies[df.package == 1].values, dims=["task", "level"])
     attribute_levels_right = pm.Data("attribute_levels_right", dummies[df.package == 2].values, dims=["task", "level"])
 
-    interaction_levels_left  = pm.Data("interaction_levels_left",  interact_df[df.package == 1].values, dims=["task", "interact"])
-    interaction_levels_right = pm.Data("interaction_levels_right", interact_df[df.package == 2].values, dims=["task", "interact"])
-
-    # prox×source interaction levels separately (for country-moderated three-way)
-    prox_source_left  = pm.Data("prox_source_left",  interact_df[df.package == 1][prox_source_cols].values, dims=["task", "prox_source_interact"])
-    prox_source_right = pm.Data("prox_source_right", interact_df[df.package == 2][prox_source_cols].values, dims=["task", "prox_source_interact"])
+    # prox x source interaction levels (used for both beta_interact and the
+    # country-moderated three-way via gamma_interact)
+    prox_source_left  = pm.Data("prox_source_left",  interact_df[df.package == 1].values, dims=["task", "prox_source_interact"])
+    prox_source_right = pm.Data("prox_source_right", interact_df[df.package == 2].values, dims=["task", "prox_source_interact"])
 
     # -- value moderation (unconstrained: reference level anchors identification) --
     theta_lreco  = pm.Normal("theta_lreco",  mu=0, sigma=1, dims="level")
@@ -194,10 +173,10 @@ with pm.Model(coords=coords) as model:
         "gamma", gamma_raw - gamma_raw.mean(axis=0), dims=["country", "level"]
     )
 
-    # -- cherry-picked interaction terms --
-    beta_interact = pm.Normal("beta_interact", mu=0, sigma=0.5, dims="interact")
+    # -- proximity x source/purpose interaction (pooled) --
+    beta_interact = pm.Normal("beta_interact", mu=0, sigma=0.5, dims="prox_source_interact")
 
-    # -- three-way: country × proximity × source (zero-sum across countries) --
+    # -- three-way: country x proximity x source (zero-sum across countries) --
     gamma_interact_raw = pm.Normal(
         "gamma_interact_raw", mu=0, sigma=0.3, dims=["country", "prox_source_interact"]
     )
@@ -219,14 +198,14 @@ with pm.Model(coords=coords) as model:
 
     # -- utilities --
     utility_left = pm.Deterministic("utility_left", (
-        pm.math.sum(attribute_levels_left  * beta_mod, axis=1)
-        + pm.math.sum(interaction_levels_left  * beta_interact, axis=1)
-        + pm.math.sum(prox_source_left  * gamma_interact[c, :], axis=1)
+        pm.math.sum(attribute_levels_left * beta_mod, axis=1)
+        + pm.math.sum(prox_source_left * beta_interact, axis=1)
+        + pm.math.sum(prox_source_left * gamma_interact[c, :], axis=1)
     ), dims="task")
 
     utility_right = pm.Deterministic("utility_right", (
         pm.math.sum(attribute_levels_right * beta_mod, axis=1)
-        + pm.math.sum(interaction_levels_right * beta_interact, axis=1)
+        + pm.math.sum(prox_source_right * beta_interact, axis=1)
         + pm.math.sum(prox_source_right * gamma_interact[c, :], axis=1)
     ), dims="task")
 
@@ -253,7 +232,7 @@ inference_data = pm.sample(
 
 # ---- diagnostics ----
 
-_main_vars    = ["beta", "delta", "gamma", "theta_lreco", "theta_galtan", "theta_ecol"]
+_main_vars     = ["beta", "delta", "gamma", "theta_lreco", "theta_galtan", "theta_ecol"]
 _interact_vars = ["beta_interact", "gamma_interact"]
 _all_vars = _main_vars + _interact_vars
 

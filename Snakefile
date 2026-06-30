@@ -10,10 +10,19 @@ rule all:
         "output/plots/supp_figs/theta_heatmap.png",
         "output/plots/value_distributions.png",
         "output/plots/supp_figs/factor_loadings.png",
+        "output/plots/interact_proximity.png",
         "output/tables/sample_description.tex",
         "output/tables/value_correlations_ch.csv",
         "output/tables/value_correlations_cn.csv",
         "output/plots/supp_figs/value_correlations.png",
+        (
+            "output/data/inference_base_hybrid_choice.nc"
+            if config.get("run_base_model", False) else []
+        ),
+        (
+            "output/data/inference_full_interaction_choice.nc"
+            if config.get("run_full_interaction_model", False) else []
+        ),
 
 
 rule preprocess:
@@ -59,48 +68,46 @@ rule basic_choice_model:
         "scripts/analysis/basic_choice_model.py"
 
 
-rule hybrid_choice_model:
-    input:
-        "data/hcm_input.csv",
-    output:
-        "output/data/inference_hybrid_choice.nc",
-    script:
-        "scripts/analysis/hybrid_choice_model.py"
-
-
-if config.get("run_interaction_model", False):
-    rule interaction_choice_model:
+# Optional, off by default — base HCM without the interaction term, kept for
+# comparison against main_hybrid_choice_model below.
+if config.get("run_base_model", False):
+    rule base_hybrid_choice_model:
         input:
             "data/hcm_input.csv",
         output:
-            "output/data/inference_interaction_choice.nc",
+            "output/data/inference_base_hybrid_choice.nc",
         script:
-            "scripts/analysis/interaction_choice_model.py"
+            "scripts/analysis/base_hybrid_choice_model.py"
 
-    rule postprocess_interactions:
-        input:
-            idata="output/data/inference_interaction_choice.nc",
-        output:
-            coefs="output/data/posteriors_interact_coefs.csv",
-            conditional="output/data/posteriors_interact_conditional.csv",
-        script:
-            "scripts/postprocessing/postprocess_interactions.py"
 
-    rule plot_interact_forest:
-        input:
-            "output/data/posteriors_interact_coefs.csv",
-        output:
-            "output/plots/supp_figs/interact_forest_beta.png",
-        shell:
-            "Rscript scripts/visualisation/plot_interact_forest.R"
+# Main model: the HCM plus the proximity x Source/Purpose x country
+# three-way interaction. Always runs — this is what all the main plots use.
+rule main_hybrid_choice_model:
+    input:
+        "data/hcm_input.csv",
+    output:
+        "output/data/inference_main_hybrid_choice.nc",
+    script:
+        "scripts/analysis/main_hybrid_choice_model.py"
 
-    rule plot_interact_conditional:
-        input:
-            "output/data/posteriors_interact_conditional.csv",
-        output:
-            "output/plots/interact_proximity.png",
-        shell:
-            "Rscript scripts/visualisation/plot_interact_conditional.R"
+
+rule postprocess_interactions:
+    input:
+        idata="output/data/inference_main_hybrid_choice.nc",
+    output:
+        coefs="output/data/posteriors_interact_coefs.csv",
+        conditional="output/data/posteriors_interact_conditional.csv",
+    script:
+        "scripts/postprocessing/postprocess_interactions.py"
+
+
+rule plot_interact_conditional:
+    input:
+        "output/data/posteriors_interact_conditional.csv",
+    output:
+        "output/plots/interact_proximity.png",
+    shell:
+        "Rscript scripts/visualisation/plot_interact_conditional.R"
 
 
 if config.get("run_full_interaction_model", False):
@@ -119,7 +126,7 @@ rule postprocess:
             "output/data/inference_basic_choice.nc"
             if config.get("run_basic_model", True) else []
         ),
-        hcm="output/data/inference_hybrid_choice.nc",
+        hcm="output/data/inference_main_hybrid_choice.nc",
         hcm_input="data/hcm_input.csv",
     output:
         beta="output/data/posteriors_beta.csv",

@@ -16,7 +16,7 @@ try:
 except NameError:
     run_basic = True
     bcm_path  = "output/data/inference_basic_choice.nc"
-    hcm_path  = "output/data/inference_hybrid_choice.nc"
+    hcm_path  = "output/data/inference_main_hybrid_choice.nc"
     hcm_input_path = "data/hcm_input.csv"
     out_beta    = "output/data/posteriors_beta.csv"
     out_country = "output/data/posteriors_country.csv"

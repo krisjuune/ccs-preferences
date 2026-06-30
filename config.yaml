@@ -3,19 +3,26 @@ raw_data:
   ch: raw_data/ccs_conjoint_CH_240225_1004.csv  # Switzerland
   cn: raw_data/ccs_conjoint_CN_240225_1752.csv  # China
 
-# Set to false to skip the basic choice model and run only the HCM
+# Set to false to skip the basic choice model (no latent traits)
 run_basic_model: false
 
-# Additional interaction models (off by default — long runtimes)
-run_interaction_model: true       # cherry-picked interactions, incl three-way with country
-run_full_interaction_model: false  # all pairwise attribute interactions
+# Set to false to skip the base hybrid choice model (HCM without the
+# interaction term). Optional — kept only for comparison against
+# main_hybrid_choice_model, which the repo's main plots use and always runs.
+run_base_model: false
 
-# Attribute coding for the hybrid choice model
+# Set to true to also run the full pairwise interaction model (all
+# attribute-level interactions, no three-way with country). Off by default —
+# long runtime.
+run_full_interaction_model: false
+
+# Attribute coding for the base hybrid choice model and basic choice model
+# (main_hybrid_choice_model always uses reference_level — see its docstring)
 # "sum_to_zero": all levels included, each beta = deviation from attribute mean
 # "reference_level": baseline level dropped, each beta = deviation from baseline
 coding: "reference_level"
 
-# MCMC sampling settings — used by both choice models
+# MCMC sampling settings — shared by all choice models
 mcmc:
   seed: 42
   draws: 1000
