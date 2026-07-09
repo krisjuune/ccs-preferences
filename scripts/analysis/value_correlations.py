@@ -79,8 +79,8 @@ data = values.merge(demo, on=["id", "country"], how="inner")
 # ---- correlation matrices, per country ----
 
 display_names = {
-    "lreco":          "Left-right economic",
-    "galtan":         "GAL-TAN",
+    "lreco":          "Socio-economic",
+    "galtan":         "Socio-cultural",
     "socio_ecol":     "Socio-ecological",
     "age_rank":       "Age",
     "education_rank": "Education",

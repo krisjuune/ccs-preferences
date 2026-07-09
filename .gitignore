@@ -5,7 +5,9 @@ scripts/quota_check.py
 /scripts/hainmueller/
 init_kernel.py
 scripts/preprocessing/__pycache__/
+scripts/analysis/__pycache__/
 .DS_Store
 .snakemake/
 .vscode/
 *.pdf
+*.pyc

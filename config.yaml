@@ -36,7 +36,7 @@ plots:
   fig_width: 10        # standard width (inches) for single-panel figures
   fig_width_wide: 14   # standard width (inches) for faceted/multi-panel figures
   dpi: 300
-  ci_width: 0.9
+  ci_width: 0.89
   point_size: 4
   point_alpha: 0.9
   slab_alpha: 0.6

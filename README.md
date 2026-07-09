@@ -53,13 +53,14 @@ snakemake --cores 4 -R plot_partworths
      traits), off by default (`run_basic_model: false`)
    - `main_hybrid_choice_model.py` — the model behind all main results: HCM
      (measurement model + value-moderated choice model) plus the proximity ×
-     Source/Purpose × country three-way interaction. Always runs.
+     Source/Purpose × country three-way interaction, plus a per-person
+     hierarchical left-choice positional bias (`alpha`). Always runs.
    - `base_hybrid_choice_model.py` — the same HCM without the interaction
      term. Optional, off by default (`run_base_model: false`), kept only for
      comparison against the main model.
    - `full_interaction_choice_model.py` — all pairwise attribute-level
-     interactions, no three-way term. Optional, off by default
-     (`run_full_interaction_model: false`).
+     interactions, no three-way term, also with the `alpha` left-choice
+     bias term. Optional, off by default (`run_full_interaction_model: false`).
 3. **Postprocessing** (`scripts/postprocessing/`) — extract posterior
    samples into tidy CSVs for plotting (partworths, country-specific
    utilities, value moderation effects, factor loadings, interaction

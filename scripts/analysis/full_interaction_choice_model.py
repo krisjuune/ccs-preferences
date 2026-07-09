@@ -5,6 +5,10 @@ Computes every non-baseline-level × non-baseline-level product across all
 attribute pairs (49 interaction parameters). Country enters via main-effect
 gamma only (no three-way interactions with country). Reference level coding
 is always used so interaction terms have a clean, unambiguous interpretation.
+
+Also includes a per-person, hierarchical left-choice positional bias (alpha):
+the tendency to pick the left-hand alternative regardless of its attributes,
+added only to utility_left (right is the reference).
 """
 import os
 from itertools import product as iterprod
@@ -175,6 +179,16 @@ with pm.Model(coords=coords) as model:
     # -- all pairwise interaction terms (tighter prior: smaller expected effects) --
     beta_interact = pm.Normal("beta_interact", mu=0, sigma=0.5, dims="interact")
 
+    # -- left-choice positional bias (per-person, hierarchical) --
+    # captures the tendency to pick the left-hand alternative regardless of
+    # its attributes; right is the reference (no constant added there)
+    alpha_mu    = pm.Normal("alpha_mu", mu=0, sigma=1)
+    alpha_sigma = pm.HalfNormal("alpha_sigma", sigma=0.5)
+    alpha_raw   = pm.Normal("alpha_raw", mu=0, sigma=1, dims="individual")
+    alpha = pm.Deterministic(
+        "alpha", alpha_mu + alpha_sigma * alpha_raw, dims="individual"
+    )
+
     # -- modulated beta --
     beta_mod = (
         beta
@@ -189,6 +203,7 @@ with pm.Model(coords=coords) as model:
     utility_left = pm.Deterministic("utility_left", (
         pm.math.sum(attribute_levels_left  * beta_mod, axis=1)
         + pm.math.sum(interaction_levels_left  * beta_interact, axis=1)
+        + alpha[individual_idx]
     ), dims="task")
 
     utility_right = pm.Deterministic("utility_right", (
@@ -207,7 +222,7 @@ with pm.Model(coords=coords) as model:
 
 priors = pm.sample_prior_predictive(draws=1000, model=model, random_seed=_seed)
 az.summary(priors, group="prior",
-           var_names=["beta", "delta", "gamma", "beta_interact"]
+           var_names=["beta", "delta", "gamma", "beta_interact", "alpha_mu", "alpha_sigma"]
            ).to_csv(f"{_out_data}_prior_summary.csv")
 
 # ---- sample ----
@@ -219,7 +234,8 @@ inference_data = pm.sample(
 
 # ---- diagnostics ----
 
-_main_vars = ["beta", "delta", "gamma", "theta_lreco", "theta_galtan", "theta_ecol"]
+_main_vars = ["beta", "delta", "gamma", "theta_lreco", "theta_galtan", "theta_ecol",
+              "alpha_mu", "alpha_sigma"]
 az.summary(inference_data, var_names=_main_vars + ["beta_interact"]
            ).to_csv(f"{_out_data}_summary.csv")
 

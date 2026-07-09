@@ -259,7 +259,7 @@ ggplot(
   ) +
   scale_colour_manual(values = c(row1_values, row2_values), na.value = NA, guide = "none") +
   facet_wrap(~ country_label, ncol = 2) +
-  labs(x = "Partworth utilities per country", y = NULL) +
+  labs(x = "Preferences per country", y = NULL) +
   theme_classic(base_size = base_size) +
   theme(
     axis.text.y          = element_markdown(lineheight = 1.2),

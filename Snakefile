@@ -133,6 +133,8 @@ rule postprocess:
         country_total="output/data/posteriors_country_total.csv",
         theta="output/data/posteriors_theta.csv",
         loadings="output/data/posteriors_loadings.csv",
+        alpha="output/data/posteriors_alpha.csv",
+        alpha_individual="output/data/posteriors_alpha_individual.csv",
     script:
         "scripts/postprocessing/postprocessing.py"
 

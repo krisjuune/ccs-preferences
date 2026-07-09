@@ -13,6 +13,8 @@ try:
     out_country_total = snakemake.output.country_total
     out_theta   = snakemake.output.theta
     out_loadings = snakemake.output.loadings
+    out_alpha   = snakemake.output.alpha
+    out_alpha_individual = snakemake.output.alpha_individual
 except NameError:
     run_basic = True
     bcm_path  = "output/data/inference_basic_choice.nc"
@@ -23,6 +25,8 @@ except NameError:
     out_country_total = "output/data/posteriors_country_total.csv"
     out_theta   = "output/data/posteriors_theta.csv"
     out_loadings = "output/data/posteriors_loadings.csv"
+    out_alpha   = "output/data/posteriors_alpha.csv"
+    out_alpha_individual = "output/data/posteriors_alpha_individual.csv"
 
 
 def extract_beta(posterior, model_name):
@@ -326,6 +330,49 @@ def extract_loadings(posterior, model_name):
     return result[["model", "dim", "item", "chain", "draw", "value"]]
 
 
+def extract_alpha(posterior, model_name):
+    """
+    Left-choice positional bias (per-person, hierarchical; only present in
+    main_hybrid_choice_model and full_interaction_choice_model).
+
+    Population-level (alpha_mu, alpha_sigma): raw posterior samples, for a
+    halfeye-style look at the overall left-choice tendency and how much it
+    varies across people.
+
+    Per-individual (alpha): posterior mean and SD only, not full draws —
+    individual x draw would be far too large (~3000 individuals) for a
+    quick-look CSV.
+
+    Returns (population_df, individual_df).
+    Population columns: model, param, chain, draw, value
+    Individual columns: model, individual, mean, sd
+    """
+    pop_rows = []
+    for param in ["alpha_mu", "alpha_sigma"]:
+        if param not in posterior:
+            continue
+        df = posterior[param].to_dataframe(name="value").reset_index()[["chain", "draw", "value"]]
+        df["model"] = model_name
+        df["param"] = param
+        pop_rows.append(df)
+    population_df = (
+        pd.concat(pop_rows, ignore_index=True)[["model", "param", "chain", "draw", "value"]]
+        if pop_rows else pd.DataFrame(columns=["model", "param", "chain", "draw", "value"])
+    )
+
+    individual_df = pd.DataFrame(columns=["model", "individual", "mean", "sd"])
+    if "alpha" in posterior:
+        alpha = posterior["alpha"]
+        individual_df = pd.DataFrame({
+            "model":      model_name,
+            "individual": alpha.individual.values,
+            "mean":       alpha.mean(dim=["chain", "draw"]).values,
+            "sd":         alpha.std(dim=["chain", "draw"]).values,
+        })[["model", "individual", "mean", "sd"]]
+
+    return population_df, individual_df
+
+
 # load inference data
 hcm = az.from_netcdf(hcm_path)
 
@@ -347,6 +394,10 @@ else:
 theta_all    = extract_theta(hcm.posterior, "hybrid")
 loadings_all = extract_loadings(hcm.posterior, "hybrid")
 
+# left-choice positional bias (only present in main_hybrid_choice_model /
+# full_interaction_choice_model — absent params are silently skipped)
+alpha_pop_all, alpha_individual_all = extract_alpha(hcm.posterior, "hybrid")
+
 # total country effect = direct (beta + gamma) + indirect (mediated by values)
 hcm_input_df       = pd.read_csv(hcm_input_path)
 indirect_all       = extract_indirect(hcm.posterior, hcm_input_df, "hybrid")
@@ -360,3 +411,5 @@ country_all.to_csv(out_country, index=False)
 country_total_all.to_csv(out_country_total, index=False)
 theta_all.to_csv(out_theta, index=False)
 loadings_all.to_csv(out_loadings, index=False)
+alpha_pop_all.to_csv(out_alpha, index=False)
+alpha_individual_all.to_csv(out_alpha_individual, index=False)

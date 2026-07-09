@@ -5,6 +5,10 @@ interaction. This is the model used for all of the repo's main results and
 plots (partworths, country direct/total effects, theta, factor loadings),
 since omitting a real interaction can bias the main-effect estimates.
 
+Also includes a per-person, hierarchical left-choice positional bias (alpha):
+the tendency to pick the left-hand alternative regardless of its attributes,
+added only to utility_left (right is the reference).
+
 Always uses reference level coding regardless of the global `coding` config
 setting, because reference level gives clean, unambiguous interaction
 estimates.
@@ -186,6 +190,16 @@ with pm.Model(coords=coords) as model:
         dims=["country", "prox_source_interact"],
     )
 
+    # -- left-choice positional bias (per-person, hierarchical) --
+    # captures the tendency to pick the left-hand alternative regardless of
+    # its attributes; right is the reference (no constant added there)
+    alpha_mu    = pm.Normal("alpha_mu", mu=0, sigma=1)
+    alpha_sigma = pm.HalfNormal("alpha_sigma", sigma=0.5)
+    alpha_raw   = pm.Normal("alpha_raw", mu=0, sigma=1, dims="individual")
+    alpha = pm.Deterministic(
+        "alpha", alpha_mu + alpha_sigma * alpha_raw, dims="individual"
+    )
+
     # -- modulated beta (main effects + framing + country + values) --
     beta_mod = (
         beta
@@ -201,6 +215,7 @@ with pm.Model(coords=coords) as model:
         pm.math.sum(attribute_levels_left * beta_mod, axis=1)
         + pm.math.sum(prox_source_left * beta_interact, axis=1)
         + pm.math.sum(prox_source_left * gamma_interact[c, :], axis=1)
+        + alpha[individual_idx]
     ), dims="task")
 
     utility_right = pm.Deterministic("utility_right", (
@@ -220,7 +235,8 @@ with pm.Model(coords=coords) as model:
 
 priors = pm.sample_prior_predictive(draws=1000, model=model, random_seed=_seed)
 az.summary(priors, group="prior",
-           var_names=["beta", "delta", "gamma", "beta_interact", "gamma_interact"]
+           var_names=["beta", "delta", "gamma", "beta_interact", "gamma_interact",
+                      "alpha_mu", "alpha_sigma"]
            ).to_csv(f"{_out_data}_prior_summary.csv")
 
 # ---- sample ----
@@ -232,7 +248,8 @@ inference_data = pm.sample(
 
 # ---- diagnostics ----
 
-_main_vars     = ["beta", "delta", "gamma", "theta_lreco", "theta_galtan", "theta_ecol"]
+_main_vars     = ["beta", "delta", "gamma", "theta_lreco", "theta_galtan", "theta_ecol",
+                  "alpha_mu", "alpha_sigma"]
 _interact_vars = ["beta_interact", "gamma_interact"]
 _all_vars = _main_vars + _interact_vars
 
