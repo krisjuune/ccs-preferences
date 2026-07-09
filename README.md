@@ -1,4 +1,4 @@
-# CCS siting preferences — choice experiment in Switzerland and China
+# Worfklow code for analysis on CCS location choice experiment
 
 Snakemake pipeline for a discrete choice experiment on public preferences
 for carbon capture and storage (CCS) site characteristics in Switzerland and
