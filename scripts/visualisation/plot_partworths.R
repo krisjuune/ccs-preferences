@@ -266,7 +266,7 @@ ggplot(
       order = 2
     )
   ) +
-  labs(x = "Partworth utility", y = NULL) +
+  labs(x = "Partworth utility (β)", y = NULL) +
   theme_classic(base_size = base_size) +
   theme(
     axis.text.y          = element_markdown(lineheight = 1.2),

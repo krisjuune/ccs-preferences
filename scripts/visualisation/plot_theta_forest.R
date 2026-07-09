@@ -100,8 +100,8 @@ y_struct <- build_y_structure()
 dim_order <- c("lreco", "galtan", "ecol")
 
 dim_labels <- c(
-  "lreco"  = "Left-right economic",
-  "galtan" = "GAL-TAN",
+  "lreco"  = "Socio-economic",
+  "galtan" = "Socio-cultural",
   "ecol"   = "Socio-ecological"
 )
 
@@ -114,7 +114,7 @@ plot_data <- theta |>
     level_base = factor(level, levels = y_struct$levels),
     attribute  = sapply(level, get_attribute),
     dim        = factor(dim, levels = dim_order),
-    dim_label  = dim_labels[dim]
+    dim_label  = factor(dim_labels[dim], levels = unname(dim_labels))
   )
 
 header_rows <- crossing(
@@ -130,7 +130,7 @@ header_rows <- crossing(
     attribute = NA_character_
   ),
   dim       = factor(dim_order, levels = dim_order),
-  dim_label = unname(dim_labels)
+  dim_label = factor(unname(dim_labels), levels = unname(dim_labels))
 )
 
 plot_data <- bind_rows(plot_data, header_rows) |>
@@ -145,7 +145,7 @@ baseline_df <- if (coding == "reference_level") {
     ),
     tibble(
       dim       = factor(dim_order, levels = dim_order),
-      dim_label = unname(dim_labels)
+      dim_label = factor(unname(dim_labels), levels = unname(dim_labels))
     )
   )
 } else NULL
@@ -177,8 +177,8 @@ ggplot(plot_data, aes(x = value, y = level_base, fill = attribute, colour = attr
   scale_fill_manual(
     name     = NULL,
     values   = attr_colours,
-    labels   = attr_display[names(attr_colours)],
-    breaks   = names(attr_colours),
+    labels   = attr_display[attr_order],
+    breaks   = attr_order,
     na.value = NA,
     guide    = guide_legend(
       nrow         = 1,
@@ -188,7 +188,7 @@ ggplot(plot_data, aes(x = value, y = level_base, fill = attribute, colour = attr
   ) +
   scale_colour_manual(values = attr_colours, na.value = NA, guide = "none") +
   facet_wrap(~ dim_label, ncol = 3) +
-  labs(x = "Value moderation effect (θ)", y = NULL) +
+  labs(x = "Preference shifts by values", y = NULL) +
   theme_classic(base_size = base_size) +
   theme(
     axis.text.y          = element_markdown(lineheight = 1.2),

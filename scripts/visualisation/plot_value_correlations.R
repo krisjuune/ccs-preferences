@@ -13,7 +13,7 @@ div_mid     <- plt$diverging_colours$mid
 div_high    <- plt$diverging_colours$high
 
 var_order <- c(
-  "Left-right economic", "GAL-TAN", "Socio-ecological",
+  "Socio-economic", "Socio-cultural", "Socio-ecological",
   "Age", "Education", "Income", "Gender (female = 1)"
 )
 

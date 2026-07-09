@@ -48,7 +48,7 @@ build_y_structure <- function() {
     header_key <- paste0("header_", framing)
     y_levels   <- c(y_levels, header_key)
     y_labels[header_key] <- paste0(
-      "**Proximity utility for ", framing, " CO<sub>2</sub>**"
+      "**Preferences for ", framing, " CO<sub>2</sub>**"
     )
 
     for (prox_l in prox_order) {
@@ -113,7 +113,7 @@ ggplot(plot_data, aes(x = value, y = level_key)) +
     drop   = FALSE
   ) +
   facet_wrap(~ country_label, ncol = 2) +
-  labs(x = "Proximity utility (β + γ)", y = NULL) +
+  labs(x = "Proximity preferences for domestic and foreign CO₂ per country", y = NULL) +
   theme_classic(base_size = base_size) +
   theme(
     axis.text.y        = element_markdown(lineheight = 1.2),

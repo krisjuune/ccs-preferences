@@ -21,8 +21,8 @@ loadings <- read_csv("output/data/posteriors_loadings.csv")
 
 dim_order <- c("lreco", "galtan", "ecol")
 dim_labels <- c(
-  "lreco"  = "Left-right economic",
-  "galtan" = "GAL-TAN",
+  "lreco"  = "Socio-economic",
+  "galtan" = "Socio-cultural",
   "ecol"   = "Socio-ecological"
 )
 

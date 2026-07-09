@@ -97,8 +97,8 @@ y_struct <- build_y_structure()
 
 dim_order  <- c("lreco", "galtan", "ecol")
 dim_labels <- c(
-  "lreco"  = "Left-right\neconomic",
-  "galtan" = "GAL-TAN",
+  "lreco"  = "Socio-\neconomic",
+  "galtan" = "Socio-\ncultural",
   "ecol"   = "Socio-\necological"
 )
 

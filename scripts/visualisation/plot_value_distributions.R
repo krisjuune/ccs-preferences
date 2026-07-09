@@ -21,8 +21,8 @@ values <- read_csv("data/data_values_ch_cn.csv") |>
 # ---- reshape ----
 
 dim_labels <- c(
-  "lreco"      = "Left-right economic",
-  "galtan"     = "GAL-TAN",
+  "lreco"      = "Socio-economic",
+  "galtan"     = "Socio-cultural",
   "socio_ecol" = "Socio-ecological"
 )
 
@@ -32,9 +32,9 @@ country_labels <- c(
 )
 
 dim_colours <- c(
-  "Left-right economic" = value_colours[["lreco"]],
-  "GAL-TAN"              = value_colours[["galtan"]],
-  "Socio-ecological"     = value_colours[["socio_ecol"]]
+  "Socio-economic"   = value_colours[["lreco"]],
+  "Socio-cultural"   = value_colours[["galtan"]],
+  "Socio-ecological" = value_colours[["socio_ecol"]]
 )
 
 values_long <- values |>
@@ -52,11 +52,10 @@ values_long <- values |>
 
 ggplot(values_long, aes(x = score, fill = dim_label, colour = dim_label)) +
   geom_density(alpha = slab_alpha, linewidth = 0.5) +
-  geom_vline(xintercept = 1.5, linetype = "dashed", colour = "grey40", linewidth = 0.4) +
   facet_wrap(~ country_label, ncol = 2) +
   scale_fill_manual(values = dim_colours, name = NULL) +
   scale_colour_manual(values = dim_colours, name = NULL) +
-  labs(x = "Value index (sum of normalised items, range 0–3)", y = "Density") +
+  labs(x = "Value distributions per country", y = "Density") +
   theme_classic(base_size = base_size) +
   theme(
     strip.text         = element_text(face = "bold", size = base_size),
