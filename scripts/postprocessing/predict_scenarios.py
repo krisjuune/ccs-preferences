@@ -29,17 +29,32 @@ Scenarios map onto the paper's four hypotheses:
       proximity aversion narrow as ecological orientation increases? Same
       pooled "locally sited" quantity and two comparators as H1, varied
       across low/high ecological orientation instead of design bundle.
+      (A vicinity x source_purpose x country crossed version — domestic vs.
+      foreign CO2 — was tried and found null: the ecol-conditioning effect
+      is essentially identical either way, and not a direct test of H2, so
+      it was reverted rather than kept as a permanent fourth dimension.)
   H3 (costs_lreco / costs_galtan / costs_ecol / source_lreco /
-      source_galtan / source_ecol) — does each value dimension moderate its
+      source_galtan / source_ecol / reason_costefficient_lreco /
+      reason_costefficient_galtan / reason_costefficient_ecol /
+      reason_closesource_lreco / reason_closesource_galtan /
+      reason_closesource_ecol) — does each value dimension moderate its
       matching attribute domain (economic/cultural values <-> cost
-      responsibility; all three <-> CO2 source/purpose)? costs_ecol is
-      included as a specificity check: H3 predicts ecol should NOT move
-      cost responsibility (unlike lreco/galtan), so a near-null costs_ecol
-      alongside a real source_ecol effect is itself evidence for the
-      domain-matching claim, not just a completeness addition. source_*
-      scenarios report P(choose domestic CO2 over foreign) — domestic as
-      option A, foreign as option B — so that "higher value -> higher P"
-      points the same direction as every other H2/H3 panel.
+      responsibility; all three <-> CO2 source/purpose; none <-> siting
+      rationale)? costs_ecol is included as a specificity check: H3
+      predicts ecol should NOT move cost responsibility (unlike
+      lreco/galtan), so a near-null costs_ecol alongside a real source_ecol
+      effect is itself evidence for the domain-matching claim, not just a
+      completeness addition. reason_* scenarios test both non-baseline
+      siting-rationale levels (vs. reference "sparsely-populated"): per the
+      theta_reason posteriors, only galtan x "close to source" clearly
+      excludes zero — cost-efficient is null-ish for all three dimensions,
+      close-to-source is borderline for lreco/galtan and null for ecol — so
+      these scenarios are expected to look mostly null throughout,
+      consistent with reason not being value-structured. source_* scenarios
+      report P(choose domestic CO2 over foreign) — domestic as option A,
+      foreign as option B — so that "higher value -> higher P" points the
+      same direction as
+      every other H2/H3 panel.
   H4 is addressed separately by scripts/tables/country_gap_decomposition.py,
       not by posterior-predictive scenarios.
 
@@ -199,6 +214,36 @@ SCENARIOS = [
     dict(
         name="source_ecol", hypothesis="H3",
         components=single({}, {"source_purpose": "foreign"}),
+        vary_dim="ecol",
+    ),
+    dict(
+        name="reason_costefficient_lreco", hypothesis="H3",
+        components=single({"reason": "cost-efficient"}),
+        vary_dim="lreco",
+    ),
+    dict(
+        name="reason_costefficient_galtan", hypothesis="H3",
+        components=single({"reason": "cost-efficient"}),
+        vary_dim="galtan",
+    ),
+    dict(
+        name="reason_costefficient_ecol", hypothesis="H3",
+        components=single({"reason": "cost-efficient"}),
+        vary_dim="ecol",
+    ),
+    dict(
+        name="reason_closesource_lreco", hypothesis="H3",
+        components=single({"reason": "close to source"}),
+        vary_dim="lreco",
+    ),
+    dict(
+        name="reason_closesource_galtan", hypothesis="H3",
+        components=single({"reason": "close to source"}),
+        vary_dim="galtan",
+    ),
+    dict(
+        name="reason_closesource_ecol", hypothesis="H3",
+        components=single({"reason": "close to source"}),
         vary_dim="ecol",
     ),
 ]

@@ -153,8 +153,9 @@ plot_by_z <- function(data, x_lab, facet_var = NULL, facet_ncol = 1, legend_titl
 
   if (!is.null(facet_rows) || !is.null(facet_cols)) {
     p <- p + facet_grid(
-      rows = if (!is.null(facet_rows)) vars(.data[[facet_rows]]) else NULL,
-      cols = if (!is.null(facet_cols)) vars(.data[[facet_cols]]) else NULL
+      rows     = if (!is.null(facet_rows)) vars(.data[[facet_rows]]) else NULL,
+      cols     = if (!is.null(facet_cols)) vars(.data[[facet_cols]]) else NULL,
+      labeller = label_wrap_gen(width = 18)
     )
   } else if (!is.null(facet_var)) {
     p <- p + facet_wrap(vars(.data[[facet_var]]), ncol = facet_ncol)
@@ -165,6 +166,10 @@ plot_by_z <- function(data, x_lab, facet_var = NULL, facet_ncol = 1, legend_titl
 # ==== H2: proximity x ecological orientation ====
 # Pooled "locally sited" quantity (your municipality or your region, equal
 # weight), same as H1. Two panels: vs. abroad and vs. another region.
+# (A vicinity x source_purpose x country crossed version — domestic vs.
+# foreign CO2 as rows — was tried and reverted: the ecol-conditioning effect
+# was essentially identical either way, a null result not directly relevant
+# to H2. See predict_scenarios.py's H2 docstring note.)
 
 h2_data <- pred_data |>
   filter(scenario %in% c("proximity_ecol_vs_abroad", "proximity_ecol_vs_region")) |>
@@ -251,29 +256,45 @@ ggsave(
   width = fig_width_w, height = 5, dpi = dpi_val, bg = "white"
 )
 
-# ==== H3: domain-matching — cost responsibility & CO2 origin x all three ====
-# value dimensions, combined into one grid (rows = value dimension, columns
-# = attribute). Cost responsibility now has all three dimensions tested
-# (including costs_ecol, a specificity check: H3 predicts ecol should NOT
-# move cost responsibility), so it lines up with source/purpose's three
-# dimensions for a direct side-by-side comparison — the domain-matching
-# pattern (costs moves with lreco/galtan but not ecol; source moves with
-# all three) is visible at a glance across the grid.
+# ==== H3: domain-matching — CO2 origin, cost responsibility & siting ====
+# rationale (both non-baseline levels) x all three value dimensions,
+# combined into one grid (rows = value dimension, columns = the specific
+# level being tested). Cost responsibility and both siting-rationale levels
+# now have all three dimensions tested (costs_ecol and the reason_*
+# scenarios are specificity checks: H3 predicts ecol should NOT move cost
+# responsibility, and no dimension should move siting rationale), so every
+# column lines up for a direct side-by-side comparison — the domain-
+# matching pattern (each attribute moves only with its hypothesised
+# dimension(s), or not at all) is visible at a glance. Column titles name
+# the level being compared (vs. reference), not the attribute, since that's
+# more informative at a glance. Per the theta_reason posteriors neither
+# reason level is credibly non-zero for any dimension except galtan x
+# close-to-source (borderline), so both reason columns are expected to
+# look mostly null — that's the expected result, not a bug.
 
 h3_data <- bind_rows(
   pred_data |>
-    filter(scenario %in% c("costs_lreco", "costs_galtan", "costs_ecol")) |>
-    mutate(dim = str_remove(scenario, "^costs_"), attribute = "Cost responsibility"),
-  pred_data |>
     filter(scenario %in% c("source_lreco", "source_galtan", "source_ecol")) |>
-    mutate(dim = str_remove(scenario, "^source_"), attribute = "CO2 origin")
+    mutate(dim = str_remove(scenario, "^source_"), attribute = "Domestic CO₂ source"),
+  pred_data |>
+    filter(scenario %in% c("costs_lreco", "costs_galtan", "costs_ecol")) |>
+    mutate(dim = str_remove(scenario, "^costs_"), attribute = "Cost responsibility on polluters"),
+  pred_data |>
+    filter(scenario %in% c("reason_costefficient_lreco", "reason_costefficient_galtan", "reason_costefficient_ecol")) |>
+    mutate(dim = str_remove(scenario, "^reason_costefficient_"), attribute = "Cost-efficiency siting rationale"),
+  pred_data |>
+    filter(scenario %in% c("reason_closesource_lreco", "reason_closesource_galtan", "reason_closesource_ecol")) |>
+    mutate(dim = str_remove(scenario, "^reason_closesource_"), attribute = "Close-to-source siting rationale")
 ) |>
   mutate(
     dim_label = factor(dim_display[dim], levels = unname(dim_display[c("lreco", "galtan", "ecol")])),
-    attribute = factor(attribute, levels = c("Cost responsibility", "CO2 origin"))
+    attribute = factor(attribute, levels = c(
+      "Domestic CO₂ source", "Cost responsibility on polluters",
+      "Cost-efficiency siting rationale", "Close-to-source siting rationale"
+    ))
   )
 
-plot_by_z(h3_data, "Predicted probability of choosing the value-aligned level",
+plot_by_z(h3_data, "Predicted probability of choosing the given level",
           facet_rows = "dim_label", facet_cols = "attribute", legend_title = "Value level") +
   theme(plot.margin = margin(10, 30, 10, 10))
 
