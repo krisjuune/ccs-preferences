@@ -66,5 +66,5 @@ ggplot(values_long, aes(x = score, fill = dim_label, colour = dim_label)) +
 
 ggsave(
   "output/plots/value_distributions.png",
-  width = 16, height = 5, dpi = dpi_val, bg = "white"
+  width = fig_width_w, height = 5, dpi = dpi_val, bg = "white"
 )

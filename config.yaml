@@ -16,6 +16,12 @@ run_base_model: false
 # long runtime.
 run_full_interaction_model: false
 
+# Set to true to also run main_choice_model_no_values (identical to
+# main_hybrid_choice_model but without value moderation / the SEM
+# measurement model). Off by default — used only for the H4 cross-model
+# country-effect comparison, not the repo's main plots.
+run_no_values_model: false
+
 # Attribute coding for the base hybrid choice model and basic choice model
 # (main_hybrid_choice_model always uses reference_level — see its docstring)
 # "sum_to_zero": all levels included, each beta = deviation from attribute mean

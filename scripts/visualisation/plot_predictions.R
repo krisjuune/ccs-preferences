@@ -186,7 +186,7 @@ plot_by_z(h2_data, "Predicted probability of choosing local siting",
 
 ggsave(
   "output/plots/predictions_proximity.png",
-  width = 16, height = 4, dpi = dpi_val, bg = "white"
+  width = fig_width_w, height = 4, dpi = dpi_val, bg = "white"
 )
 
 # ==== H1: inclusive design (inclusive / neutral / extractive bundle) ====
@@ -255,37 +255,32 @@ ggplot(
 
 ggsave(
   "output/plots/predictions_design.png",
-  width = 16, height = 5, dpi = dpi_val, bg = "white"
+  width = fig_width_w, height = 5, dpi = dpi_val, bg = "white"
 )
 
-# ==== H3: domain-matching — CO2 origin (by framing), cost responsibility ====
-# & siting rationale (both non-baseline levels) x all three value
-# dimensions, combined into one grid (rows = value dimension, columns = the
-# specific level being tested). Cost responsibility and both siting-
-# rationale levels have all three dimensions tested (costs_ecol and the
-# reason_* scenarios are specificity checks: H3 predicts ecol should NOT
-# move cost responsibility, and no dimension should move siting rationale),
-# so every column lines up for a direct side-by-side comparison — the
-# domain-matching pattern (each attribute moves only with its hypothesised
+# ==== H3: domain-matching — CO2 origin, cost responsibility & siting ====
+# rationale (both non-baseline levels) x all three value dimensions,
+# combined into one grid (rows = value dimension, columns = the specific
+# level being tested). Cost responsibility and both siting-rationale levels
+# have all three dimensions tested (costs_ecol and the reason_* scenarios
+# are specificity checks: H3 predicts ecol should NOT move cost
+# responsibility, and no dimension should move siting rationale), so every
+# column lines up for a direct side-by-side comparison — the domain-
+# matching pattern (each attribute moves only with its hypothesised
 # dimension(s), or not at all) is visible at a glance. Column titles name
 # the level being compared (vs. reference), not the attribute, since that's
-# more informative at a glance. The CO2-origin columns are split by the
-# source/purpose framing survey condition (delta) rather than averaged —
-# does the value-moderation of CO2-origin preference itself depend on
-# framing? Per the theta_reason posteriors neither reason level is credibly
-# non-zero for any dimension except galtan x close-to-source (borderline),
-# so both reason columns are expected to look mostly null — that's the
-# expected result, not a bug.
+# more informative at a glance. Domestic CO2 is pooled across the
+# source/purpose framing survey condition (a framing-split version was
+# tried and reverted — see predict_scenarios.py's H3 docstring note). Per
+# the theta_reason posteriors neither reason level is credibly non-zero for
+# any dimension except galtan x close-to-source (borderline), so both
+# reason columns are expected to look mostly null — that's the expected
+# result, not a bug.
 
 h3_data <- bind_rows(
   pred_data |>
-    filter(scenario %in% c("source_lreco_sourceframe", "source_galtan_sourceframe", "source_ecol_sourceframe")) |>
-    mutate(dim = scenario |> str_remove("^source_") |> str_remove("_sourceframe$"),
-           attribute = "Domestic CO₂ (source framing)"),
-  pred_data |>
-    filter(scenario %in% c("source_lreco_purposeframe", "source_galtan_purposeframe", "source_ecol_purposeframe")) |>
-    mutate(dim = scenario |> str_remove("^source_") |> str_remove("_purposeframe$"),
-           attribute = "Domestic CO₂ (purpose framing)"),
+    filter(scenario %in% c("source_lreco", "source_galtan", "source_ecol")) |>
+    mutate(dim = str_remove(scenario, "^source_"), attribute = "Domestic CO₂ source"),
   pred_data |>
     filter(scenario %in% c("costs_lreco", "costs_galtan", "costs_ecol")) |>
     mutate(dim = str_remove(scenario, "^costs_"), attribute = "Cost responsibility on polluters"),
@@ -299,8 +294,7 @@ h3_data <- bind_rows(
   mutate(
     dim_label = factor(dim_display[dim], levels = unname(dim_display[c("lreco", "galtan", "ecol")])),
     attribute = factor(attribute, levels = c(
-      "Domestic CO₂ (source framing)", "Domestic CO₂ (purpose framing)",
-      "Cost responsibility on polluters",
+      "Domestic CO₂ source", "Cost responsibility on polluters",
       "Cost-efficiency siting rationale", "Close-to-source siting rationale"
     ))
   )
@@ -312,5 +306,5 @@ plot_by_z(h3_data, "Predicted probability of choosing the given level",
 
 ggsave(
   "output/plots/predictions_values.png",
-  width = 16, height = 10, dpi = dpi_val, bg = "white"
+  width = fig_width_w, height = 10, dpi = dpi_val, bg = "white"
 )

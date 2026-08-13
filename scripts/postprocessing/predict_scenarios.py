@@ -53,13 +53,11 @@ Scenarios map onto the paper's four hypotheses:
       consistent with reason not being value-structured. source_* scenarios
       report P(choose domestic CO2 over foreign) — domestic as option A,
       foreign as option B — so that "higher value -> higher P" points the
-      same direction as every other H2/H3 panel. source_{dim}_{source,
-      purpose}frame split the CO2-origin scenarios by the source/purpose
-      framing survey condition (the delta term — distinct from the
-      source_purpose attribute level itself): does the value-moderation of
-      CO2-origin preference differ depending on which framing respondents
-      saw? Not addressed elsewhere — country_total.png shows the direct
-      (non-value-conditional) framing split, but not this crossing.
+      same direction as every other H2/H3 panel, and use the "average"
+      framing (f=0, pooled across the source/purpose survey conditions —
+      see FRAMING_VALUES) since the framing-split version was tried and
+      reverted: it added two columns to predictions_values.png without a
+      strong enough substantive payoff to justify the added complexity.
   H4 is addressed separately by scripts/tables/country_gap_decomposition.py,
       not by posterior-predictive scenarios.
 
@@ -207,34 +205,19 @@ SCENARIOS = [
         vary_dim="ecol",
     ),
     dict(
-        name="source_lreco_sourceframe", hypothesis="H3",
+        name="source_lreco", hypothesis="H3",
         components=single({}, {"source_purpose": "foreign"}),
-        vary_dim="lreco", framing="source",
+        vary_dim="lreco",
     ),
     dict(
-        name="source_galtan_sourceframe", hypothesis="H3",
+        name="source_galtan", hypothesis="H3",
         components=single({}, {"source_purpose": "foreign"}),
-        vary_dim="galtan", framing="source",
+        vary_dim="galtan",
     ),
     dict(
-        name="source_ecol_sourceframe", hypothesis="H3",
+        name="source_ecol", hypothesis="H3",
         components=single({}, {"source_purpose": "foreign"}),
-        vary_dim="ecol", framing="source",
-    ),
-    dict(
-        name="source_lreco_purposeframe", hypothesis="H3",
-        components=single({}, {"source_purpose": "foreign"}),
-        vary_dim="lreco", framing="purpose",
-    ),
-    dict(
-        name="source_galtan_purposeframe", hypothesis="H3",
-        components=single({}, {"source_purpose": "foreign"}),
-        vary_dim="galtan", framing="purpose",
-    ),
-    dict(
-        name="source_ecol_purposeframe", hypothesis="H3",
-        components=single({}, {"source_purpose": "foreign"}),
-        vary_dim="ecol", framing="purpose",
+        vary_dim="ecol",
     ),
     dict(
         name="reason_costefficient_lreco", hypothesis="H3",
@@ -269,13 +252,7 @@ SCENARIOS = [
 ]
 
 Z_LOW, Z_HIGH = -1.5, 1.5   # SD units from population mean, latent scale
-
-# Per-scenario framing: "average" (f=0, no split — the default when a
-# scenario omits "framing") pools across the source/purpose survey
-# conditions; "source"/"purpose" isolate one framing condition via delta's
-# f_val (matches the +-0.5 convention in postprocess_interactions.py /
-# main_hybrid_choice_model.py's f = framing.cat.codes - 0.5).
-FRAMING_VALUES = {"average": 0.0, "source": 0.5, "purpose": -0.5}
+FRAMING_F = 0.0             # "average" framing (no source/purpose split)
 
 # ---- load posterior ----
 
@@ -334,15 +311,14 @@ with pm.Model(coords=coords) as pred_model:
     for sc in SCENARIOS:
         theta = theta_by_dim[sc["vary_dim"]] if sc["vary_dim"] else theta_ecol
         z_pairs = [("low", Z_LOW), ("high", Z_HIGH)] if sc["vary_dim"] else [("fixed", 0.0)]
-        f_val = FRAMING_VALUES[sc.get("framing", "average")]
 
         for c_idx, country in enumerate(country_coords):
             for z_label, z_val in z_pairs:
                 p_total = 0.0
                 for comp in sc["components"]:
                     delta_u = (
-                        option_utility(levels_of(comp["option_a"]), theta, c_idx, z_val, f_val)
-                        - option_utility(levels_of(comp["option_b"]), theta, c_idx, z_val, f_val)
+                        option_utility(levels_of(comp["option_a"]), theta, c_idx, z_val, FRAMING_F)
+                        - option_utility(levels_of(comp["option_b"]), theta, c_idx, z_val, FRAMING_F)
                     )
                     p_total = p_total + comp["weight"] * pm.math.sigmoid(delta_u)
                 det_name = f"P_{sc['name']}_{country}_{z_label}"
@@ -455,7 +431,6 @@ for hyp in sorted({sc["hypothesis"] for sc in SCENARIOS}):
             L.append(f"  Varying  : {sc['vary_dim']} (low={Z_LOW}, high={Z_HIGH})")
         else:
             L.append("  Varying  : none (fixed at population mean)")
-        L.append(f"  Framing  : {sc.get('framing', 'average')}")
         blank()
 
         for country in country_coords:

@@ -26,6 +26,10 @@ rule all:
             "output/data/inference_full_interaction_choice.nc"
             if config.get("run_full_interaction_model", False) else []
         ),
+        (
+            "output/data/inference_main_choice_no_values.nc"
+            if config.get("run_no_values_model", False) else []
+        ),
 
 
 rule preprocess:
@@ -92,6 +96,21 @@ rule main_hybrid_choice_model:
         "output/data/inference_main_hybrid_choice.nc",
     script:
         "scripts/analysis/main_hybrid_choice_model.py"
+
+
+# Optional, off by default — H4 comparator: identical to
+# main_hybrid_choice_model but without value moderation (no theta terms, no
+# SEM measurement model). Used only to compare gamma[country] against the
+# main model's gamma, isolating how much adding individual-level values
+# changes the estimated country effect.
+if config.get("run_no_values_model", False):
+    rule main_choice_model_no_values:
+        input:
+            "data/hcm_input.csv",
+        output:
+            "output/data/inference_main_choice_no_values.nc",
+        script:
+            "scripts/analysis/main_choice_model_no_values.py"
 
 
 rule postprocess_interactions:
