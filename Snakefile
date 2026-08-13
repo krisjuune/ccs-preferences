@@ -9,8 +9,12 @@ rule all:
         "output/plots/supp_figs/theta_heatmap.png",
         "output/plots/value_distributions.png",
         "output/plots/supp_figs/factor_loadings.png",
-        "output/plots/interact_proximity.png",
+        "output/plots/predictions_proximity.png",
+        "output/plots/predictions_design.png",
+        "output/plots/predictions_values.png",
         "output/tables/sample_description.tex",
+        "output/tables/model_diagnostics.tex",
+        "output/tables/country_gap_decomposition.tex",
         "output/tables/value_correlations_ch.csv",
         "output/tables/value_correlations_cn.csv",
         "output/plots/supp_figs/value_correlations.png",
@@ -93,6 +97,7 @@ rule main_hybrid_choice_model:
 rule postprocess_interactions:
     input:
         idata="output/data/inference_main_hybrid_choice.nc",
+        hcm_input="data/hcm_input.csv",
     output:
         coefs="output/data/posteriors_interact_coefs.csv",
         conditional="output/data/posteriors_interact_conditional.csv",
@@ -100,13 +105,18 @@ rule postprocess_interactions:
         "scripts/postprocessing/postprocess_interactions.py"
 
 
-rule plot_interact_conditional:
+# Scenario-based posterior-predictive probabilities for the paper's four
+# hypotheses (H1 inclusive design, H2 proximity x ecol, H3 cost/source x
+# values). H4 is addressed separately by rule country_gap_decomposition.
+rule predict_scenarios:
     input:
-        "output/data/posteriors_interact_conditional.csv",
+        "output/data/inference_main_hybrid_choice.nc",
     output:
-        "output/plots/interact_proximity.png",
-    shell:
-        "Rscript scripts/visualisation/plot_interact_conditional.R"
+        csv="output/predictions/prediction_scenarios.csv",
+        nc="output/predictions/prediction_scenarios.nc",
+        txt="output/predictions/prediction_scenarios.txt",
+    script:
+        "scripts/postprocessing/predict_scenarios.py"
 
 
 if config.get("run_full_interaction_model", False):
@@ -151,10 +161,22 @@ rule plot_partworths:
 rule plot_country_total:
     input:
         "output/data/posteriors_country_total.csv",
+        "output/data/posteriors_interact_conditional.csv",
     output:
         "output/plots/country_total.png",
     shell:
         "Rscript scripts/visualisation/plot_country_total.R"
+
+
+rule plot_predictions:
+    input:
+        "output/predictions/prediction_scenarios.csv",
+    output:
+        "output/plots/predictions_proximity.png",
+        "output/plots/predictions_design.png",
+        "output/plots/predictions_values.png",
+    shell:
+        "Rscript scripts/visualisation/plot_predictions.R"
 
 
 rule plot_theta_forest:
@@ -191,6 +213,27 @@ rule plot_loadings:
         "output/plots/supp_figs/factor_loadings.png",
     shell:
         "Rscript scripts/visualisation/plot_factor_loadings.R"
+
+
+rule model_diagnostics:
+    input:
+        "output/data/inference_main_hybrid_choice.nc",
+    output:
+        "output/tables/model_diagnostics.tex",
+    script:
+        "scripts/tables/model_diagnostics.py"
+
+
+# H4: how much of the Switzerland-China gap in proximity preference is
+# compositional (explained by differing value distributions) vs. residual.
+rule country_gap_decomposition:
+    input:
+        country="output/data/posteriors_country.csv",
+        country_total="output/data/posteriors_country_total.csv",
+    output:
+        "output/tables/country_gap_decomposition.tex",
+    script:
+        "scripts/tables/country_gap_decomposition.py"
 
 
 rule sample_description:

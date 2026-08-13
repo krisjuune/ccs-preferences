@@ -42,18 +42,12 @@ dim_colours <- c(
 
 # ---- prepare data ----
 
+# item_display labels updated: item 1 is no longer fixed at a point but
+# estimated (standardized) per draw
+item_display["item_1"] <- "Item 1"
+
 plot_data <- loadings |>
   filter(model == "hybrid") |>
-  mutate(
-    dim_label  = factor(dim_labels[dim], levels = unname(dim_labels)),
-    item_label = factor(item_display[item], levels = unname(item_display))
-  )
-
-# item 1 per dimension is fixed to 1 (not estimated) — shown as a reference dot
-fixed_df <- crossing(
-  tibble(dim = dim_order),
-  tibble(item = "item_1")
-) |>
   mutate(
     dim_label  = factor(dim_labels[dim], levels = unname(dim_labels)),
     item_label = factor(item_display[item], levels = unname(item_display))
@@ -69,19 +63,14 @@ ggplot(plot_data, aes(x = value, y = item_label, colour = dim)) +
     na.rm          = TRUE
   ) +
   geom_vline(xintercept = 1, linetype = "dashed", colour = "grey40", linewidth = 0.5) +
-  geom_point(
-    data  = fixed_df,
-    aes(x = 1, y = item_label, colour = dim),
-    size  = point_size, shape = 19, na.rm = TRUE,
-    inherit.aes = FALSE
-  ) +
+  scale_x_continuous(limits = c(0.9, 1)) +
   scale_y_discrete(
     limits = rev(item_order |> (\(x) item_display[x])() |> unname()),
     drop   = FALSE
   ) +
   scale_colour_manual(values = dim_colours, guide = "none") +
   facet_wrap(~ dim_label, ncol = 3) +
-  labs(x = "Factor loading (λ)", y = NULL) +
+  labs(x = "Standardized factor loading", y = NULL) +
   theme_classic(base_size = base_size) +
   theme(
     strip.text         = element_text(face = "bold", size = base_size),

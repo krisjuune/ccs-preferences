@@ -300,30 +300,47 @@ def combine_total(direct_df, indirect_df):
 
 def extract_loadings(posterior, model_name):
     """
-    Factor loadings from the measurement model (SEM part of the HCM).
+    Standardized factor loadings from the measurement model (SEM part of the HCM).
 
-    Item 1 per latent dimension is fixed to 1 for scale identification (not
-    estimated); items 2 and 3 are free loadings (lambda_lreco, lambda_galtan,
-    lambda_ecol).
+    Item 1 per dimension is fixed to λ=1 (unstandardized) for identification;
+    its standardized value is 1 / sqrt(1 + σ²_likert), which varies per draw.
+    Items 2 and 3: λ_std = λ / sqrt(λ² + σ²_likert).
 
     Columns: model, dim, item, chain, draw, value
     """
     rows = []
     dim_params = {"lreco": "lambda_lreco", "galtan": "lambda_galtan", "ecol": "lambda_ecol"}
+    sigma    = posterior["likert_sigma"]      # (chain, draw)
+    sigma_sq = sigma ** 2
+
     for dim, param in dim_params.items():
         if param not in posterior:
             continue
-        lam = posterior[param]  # (chain, draw, 2) — items 2 and 3
+        lam      = posterior[param]  # (chain, draw, 2) — items 2 and 3
         item_dim = lam.dims[-1]
+
+        # Item 1: fixed λ=1, standardized = 1 / sqrt(1 + σ²)
+        lam_std_1 = 1.0 / np.sqrt(1.0 + sigma_sq)
+        df1 = (
+            lam_std_1.to_dataframe(name="value")
+            .reset_index()[["chain", "draw", "value"]]
+        )
+        df1["model"] = model_name
+        df1["dim"]   = dim
+        df1["item"]  = "item_1"
+        rows.append(df1)
+
+        # Items 2 and 3: standardized = λ / sqrt(λ² + σ²)
         for i, item in enumerate(["item_2", "item_3"]):
+            lam_i     = lam.isel({item_dim: i})
+            lam_std_i = lam_i / np.sqrt(lam_i ** 2 + sigma_sq)
             df = (
-                lam.isel({item_dim: i})
-                .to_dataframe(name="value")
+                lam_std_i.to_dataframe(name="value")
                 .reset_index()[["chain", "draw", "value"]]
             )
             df["model"] = model_name
-            df["dim"] = dim
-            df["item"] = item
+            df["dim"]   = dim
+            df["item"]  = item
             rows.append(df)
 
     result = pd.concat(rows, ignore_index=True)

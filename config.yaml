@@ -57,6 +57,10 @@ plots:
     socio_ecol: "#59a14f"
   # two-colour scheme: diverging gradient (e.g. theta heatmap)
   diverging_colours:
-    low:  "#b07aa1"
-    mid:  "white"
-    high: "#59a14f"
+    low:     "#b07aa1"
+    mid:     "white"
+    high:    "#59a14f"
+    # neutral grey for three-category low/neutral/high plots (e.g.
+    # extractive/neutral/inclusive design bundles) — "mid" above is a
+    # gradient midpoint (white), not a visible category swatch
+    neutral: "#8c8c8c"
