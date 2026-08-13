@@ -79,7 +79,8 @@ comparison_label_from_scenario <- function(scenario) {
 # neutral grey provides the Low/High legend, which is about opacity only.
 
 plot_by_z <- function(data, x_lab, facet_var = NULL, facet_ncol = 1, legend_title = NULL,
-                       facet_rows = NULL, facet_cols = NULL) {
+                       facet_rows = NULL, facet_cols = NULL,
+                       x_breaks = c(0, 0.25, 0.5, 0.75, 1)) {
   data <- data |>
     mutate(fill_hex = dim_base_colour[dim])
 
@@ -136,6 +137,7 @@ plot_by_z <- function(data, x_lab, facet_var = NULL, facet_ncol = 1, legend_titl
     ) +
     scale_x_continuous(
       limits = c(0, 1),
+      breaks = x_breaks,
       labels = scales::percent_format(accuracy = 1),
       expand = expansion(mult = c(0.01, 0.05))
     ) +
@@ -178,13 +180,13 @@ h2_data <- pred_data |>
     comparison_label  = comparison_label_from_scenario(scenario)
   )
 
-plot_by_z(h2_data, "Predicted probability of local siting",
+plot_by_z(h2_data, "Predicted probability of choosing local siting",
           facet_var = "comparison_label", facet_ncol = 2,
           legend_title = "Ecological orientation")
 
 ggsave(
   "output/plots/predictions_proximity.png",
-  width = fig_width_w, height = 4, dpi = dpi_val, bg = "white"
+  width = 16, height = 4, dpi = dpi_val, bg = "white"
 )
 
 # ==== H1: inclusive design (inclusive / neutral / extractive bundle) ====
@@ -240,7 +242,7 @@ ggplot(
   ) +
   scale_y_discrete(limits = country_order) +
   facet_wrap(vars(comparison_label), ncol = 2) +
-  labs(x = "Predicted probability of local siting", y = NULL) +
+  labs(x = "Predicted probability of choosing local siting", y = NULL) +
   theme_classic(base_size = base_size) +
   theme(
     panel.grid.major.x   = element_line(colour = "grey92", linewidth = 0.4),
@@ -253,29 +255,37 @@ ggplot(
 
 ggsave(
   "output/plots/predictions_design.png",
-  width = fig_width_w, height = 5, dpi = dpi_val, bg = "white"
+  width = 16, height = 5, dpi = dpi_val, bg = "white"
 )
 
-# ==== H3: domain-matching — CO2 origin, cost responsibility & siting ====
-# rationale (both non-baseline levels) x all three value dimensions,
-# combined into one grid (rows = value dimension, columns = the specific
-# level being tested). Cost responsibility and both siting-rationale levels
-# now have all three dimensions tested (costs_ecol and the reason_*
-# scenarios are specificity checks: H3 predicts ecol should NOT move cost
-# responsibility, and no dimension should move siting rationale), so every
-# column lines up for a direct side-by-side comparison — the domain-
-# matching pattern (each attribute moves only with its hypothesised
+# ==== H3: domain-matching — CO2 origin (by framing), cost responsibility ====
+# & siting rationale (both non-baseline levels) x all three value
+# dimensions, combined into one grid (rows = value dimension, columns = the
+# specific level being tested). Cost responsibility and both siting-
+# rationale levels have all three dimensions tested (costs_ecol and the
+# reason_* scenarios are specificity checks: H3 predicts ecol should NOT
+# move cost responsibility, and no dimension should move siting rationale),
+# so every column lines up for a direct side-by-side comparison — the
+# domain-matching pattern (each attribute moves only with its hypothesised
 # dimension(s), or not at all) is visible at a glance. Column titles name
 # the level being compared (vs. reference), not the attribute, since that's
-# more informative at a glance. Per the theta_reason posteriors neither
-# reason level is credibly non-zero for any dimension except galtan x
-# close-to-source (borderline), so both reason columns are expected to
-# look mostly null — that's the expected result, not a bug.
+# more informative at a glance. The CO2-origin columns are split by the
+# source/purpose framing survey condition (delta) rather than averaged —
+# does the value-moderation of CO2-origin preference itself depend on
+# framing? Per the theta_reason posteriors neither reason level is credibly
+# non-zero for any dimension except galtan x close-to-source (borderline),
+# so both reason columns are expected to look mostly null — that's the
+# expected result, not a bug.
 
 h3_data <- bind_rows(
   pred_data |>
-    filter(scenario %in% c("source_lreco", "source_galtan", "source_ecol")) |>
-    mutate(dim = str_remove(scenario, "^source_"), attribute = "Domestic CO₂ source"),
+    filter(scenario %in% c("source_lreco_sourceframe", "source_galtan_sourceframe", "source_ecol_sourceframe")) |>
+    mutate(dim = scenario |> str_remove("^source_") |> str_remove("_sourceframe$"),
+           attribute = "Domestic CO₂ (source framing)"),
+  pred_data |>
+    filter(scenario %in% c("source_lreco_purposeframe", "source_galtan_purposeframe", "source_ecol_purposeframe")) |>
+    mutate(dim = scenario |> str_remove("^source_") |> str_remove("_purposeframe$"),
+           attribute = "Domestic CO₂ (purpose framing)"),
   pred_data |>
     filter(scenario %in% c("costs_lreco", "costs_galtan", "costs_ecol")) |>
     mutate(dim = str_remove(scenario, "^costs_"), attribute = "Cost responsibility on polluters"),
@@ -289,16 +299,18 @@ h3_data <- bind_rows(
   mutate(
     dim_label = factor(dim_display[dim], levels = unname(dim_display[c("lreco", "galtan", "ecol")])),
     attribute = factor(attribute, levels = c(
-      "Domestic CO₂ source", "Cost responsibility on polluters",
+      "Domestic CO₂ (source framing)", "Domestic CO₂ (purpose framing)",
+      "Cost responsibility on polluters",
       "Cost-efficiency siting rationale", "Close-to-source siting rationale"
     ))
   )
 
 plot_by_z(h3_data, "Predicted probability of choosing the given level",
-          facet_rows = "dim_label", facet_cols = "attribute", legend_title = "Value level") +
+          facet_rows = "dim_label", facet_cols = "attribute", legend_title = "Value level",
+          x_breaks = c(0.25, 0.5, 0.75)) +
   theme(plot.margin = margin(10, 30, 10, 10))
 
 ggsave(
   "output/plots/predictions_values.png",
-  width = fig_width_w, height = 10, dpi = dpi_val, bg = "white"
+  width = 16, height = 10, dpi = dpi_val, bg = "white"
 )
